@@ -4,7 +4,7 @@ import SwiftUI
 /// How the menu bar line looks. Stored inside Settings; empty color = system default.
 struct Appearance: Codable, Equatable {
     enum FontStyle: String, Codable, CaseIterable { case mono, system, rounded }
-    enum Background: String, Codable, CaseIterable { case none, pill, solid }
+    enum Background: String, Codable, CaseIterable { case none, pill, solid, hideMenus }
 
     var textColor = ""          // hex like "#FFFFFF"; "" = system label colour
     var typedColor = ""         // already-typed characters; "" = faint label colour
@@ -13,7 +13,7 @@ struct Appearance: Codable, Equatable {
     var suggestionColor = ""    // "" = secondary label colour
     var fontStyle: FontStyle = .mono
     var fontSize: Double = 12
-    var background: Background = .none
+    var background: Background = .hideMenus
     var backgroundColor = "#000000"
     var backgroundOpacity: Double = 0.5
     var cornerRadius: Double = 6

@@ -146,12 +146,17 @@ final class StatusItemController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 let screen = self.item.button?.window?.screen ?? NSScreen.screens.first
-                let atTop = screen.map { mouse.y >= $0.frame.maxY - 30 } ?? true
+                // macOS reveals the hidden bar only when the cursor hits the top edge, and keeps
+                // it while the cursor stays within the bar — mirror that with two thresholds.
+                let top = screen?.frame.maxY ?? 0
+                let atTop = self.menuBarVisible ? mouse.y >= top - 40 : mouse.y >= top - 1
                 let visible = !fullScreen || atTop
                 let band = fullScreen && !atTop && (screen.map { self.measureBand(on: $0) } ?? false)
                 let dark: NSAppearance? = fullScreen ? NSAppearance(named: .darkAqua) : nil
                 self.overlay.appearance = dark
                 self.overlayRight.appearance = dark
+                self.overlay.forceBlack = fullScreen
+                self.overlayRight.forceBlack = fullScreen
                 guard visible != self.menuBarVisible || band != self.bandMode else { return }
                 self.menuBarVisible = visible
                 self.bandMode = band

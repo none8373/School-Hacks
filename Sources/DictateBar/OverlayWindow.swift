@@ -6,6 +6,8 @@ final class OverlayWindow: NSPanel {
     private let label = NSTextField(labelWithString: "")
     private let trailing = NSTextField(labelWithString: "")
     private let blur = NSVisualEffectView()
+    private let tint = NSView()
+    private var fullHeight = false
     var onClick: (() -> Void)?
 
     init() {
@@ -32,6 +34,11 @@ final class OverlayWindow: NSPanel {
         blur.isHidden = true
         blur.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(blur)
+        // Opaque wash the colour of the menu bar so app menu titles beneath are hidden.
+        tint.wantsLayer = true
+        tint.isHidden = true
+        tint.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(tint)
 
         for field in [label, trailing] {
             field.lineBreakMode = .byClipping
@@ -45,6 +52,8 @@ final class OverlayWindow: NSPanel {
         NSLayoutConstraint.activate([
             blur.leadingAnchor.constraint(equalTo: content.leadingAnchor), blur.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             blur.topAnchor.constraint(equalTo: content.topAnchor), blur.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            tint.leadingAnchor.constraint(equalTo: content.leadingAnchor), tint.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            tint.topAnchor.constraint(equalTo: content.topAnchor), tint.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 8),
             label.centerYAnchor.constraint(equalTo: content.centerYAnchor),
             trailing.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8),
@@ -60,7 +69,9 @@ final class OverlayWindow: NSPanel {
     func apply(_ appearance: Appearance) {
         label.font = appearance.font
         trailing.font = appearance.font
-        contentView?.layer?.cornerRadius = appearance.cornerRadius
+        contentView?.layer?.cornerRadius = appearance.background == .hideMenus ? 0 : appearance.cornerRadius
+        fullHeight = appearance.background == .hideMenus
+        tint.isHidden = appearance.background != .hideMenus
         switch appearance.background {
         case .none:
             blur.isHidden = true
@@ -71,15 +82,34 @@ final class OverlayWindow: NSPanel {
         case .solid:
             blur.isHidden = true
             contentView?.layer?.backgroundColor = appearance.backgroundNSColor.cgColor
+        case .hideMenus:
+            blur.isHidden = false
+            blur.material = .titlebar
+            contentView?.layer?.backgroundColor = nil
         }
+        updateTint()
+    }
+
+    /// Menu bar-ish colour that follows light/dark mode (and the black full-screen band).
+    private func updateTint() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let color = forceBlack ? NSColor.black : (dark ? NSColor(white: 0.12, alpha: 0.92) : NSColor(white: 0.93, alpha: 0.92))
+        tint.layer?.backgroundColor = color.cgColor
+    }
+
+    /// In a full-screen app the strip sits on the black notch band.
+    var forceBlack = false { didSet { updateTint() } }
+
+    override var appearance: NSAppearance? {
+        didSet { updateTint() }
     }
 
     func show(text: NSAttributedString, trailing trailingText: NSAttributedString?, x: ClosedRange<CGFloat>, on screen: NSScreen) {
         label.attributedStringValue = text
         trailing.attributedStringValue = trailingText ?? NSAttributedString()
         trailing.isHidden = trailingText == nil
-        let height: CGFloat = 22
         let menuBar = max(24, min(screen.frame.maxY - screen.visibleFrame.maxY, 44))
+        let height: CGFloat = fullHeight ? menuBar : 22
         let y = screen.frame.maxY - menuBar + (menuBar - height) / 2
         setFrame(NSRect(x: x.lowerBound, y: y, width: x.upperBound - x.lowerBound, height: height), display: true)
         orderFrontRegardless()

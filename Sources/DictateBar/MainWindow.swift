@@ -436,6 +436,7 @@ private struct AppearanceView: View {
             }
             Section("Background") {
                 Picker("Style", selection: $settings.appearance.background) {
+                    Text("Hide app menus (menu bar colour)").tag(Appearance.Background.hideMenus)
                     Text("None (plain text)").tag(Appearance.Background.none)
                     Text("Blurred pill").tag(Appearance.Background.pill)
                     Text("Solid color").tag(Appearance.Background.solid)
@@ -444,7 +445,7 @@ private struct AppearanceView: View {
                     ColorPicker("Color", selection: HexColorBinding.make($settings.appearance.backgroundColor, fallback: .black))
                     Slider(value: $settings.appearance.backgroundOpacity, in: 0.1...1) { Text("Opacity") }
                 }
-                if settings.appearance.background != .none {
+                if settings.appearance.background == .pill || settings.appearance.background == .solid {
                     Slider(value: $settings.appearance.cornerRadius, in: 0...11, step: 1) { Text("Corner radius") }
                 }
             }
@@ -490,6 +491,7 @@ private struct PreviewLine: View {
     @ViewBuilder private var previewBackground: some View {
         switch appearance.background {
         case .none: Color.clear
+        case .hideMenus: Color(nsColor: .windowBackgroundColor)
         case .pill: Color(nsColor: .controlBackgroundColor).opacity(0.8)
         case .solid: Color(nsColor: appearance.backgroundNSColor)
         }
