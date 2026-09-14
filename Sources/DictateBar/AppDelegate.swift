@@ -15,8 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let calendar = CalendarSync()
     private var classStartedAt: Date?
     private var lastClassNotes: String?
-    private lazy var settingsWindow = SettingsWindowController(onChange: { [weak self] updated in self?.apply(updated) },
-                                                               onOpenSetup: { [weak self] in self?.setupWindow.show() })
+    private let state = AppState()
+    private lazy var mainWindow = MainWindowController(state: state)
     private lazy var setupWindow: SetupWindowController = {
         let c = SetupWindowController()
         c.model.runCanvasSync = { [weak self] in
@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(guide: guide)
         statusItem.lineChars = settings.lineChars
         statusItem.coverAppMenus = settings.coverAppMenus
+        statusItem.appearance = settings.appearance
 
         statusItem.onPlayPause = { [weak self] in self?.togglePlay() }
         statusItem.onHide = { [weak self] in self?.toggleHidden() }
@@ -39,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onClipboard = { [weak self] in self?.promptFromClipboard() }
         statusItem.onNotes = { [weak self] in self?.showNotes() }
         statusItem.onGrade = { [weak self] in self?.gradeFrontDocument() }
-        statusItem.onSettings = { [weak self] in self?.settingsWindow.show() }
+        statusItem.onSettings = { [weak self] in self?.mainWindow.show(page: .settings) }
+        statusItem.onOpenWindow = { [weak self] in self?.mainWindow.show() }
+        wireState()
         statusItem.onSetup = { [weak self] in self?.setupWindow.show() }
         statusItem.onClassRecord = { [weak self] in self?.toggleClassRecording() }
         statusItem.onPasteNotes = { [weak self] in self?.pasteClassNotes() }
@@ -88,6 +91,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: Main window state
+
+    private func wireState() {
+        state.actions.record = { [weak self] in self?.toggleRecording() }
+        state.actions.recordClass = { [weak self] in self?.toggleClassRecording() }
+        state.actions.clipboardPrompt = { [weak self] in self?.promptFromClipboard() }
+        state.actions.notes = { [weak self] in self?.showNotes() }
+        state.actions.grade = { [weak self] in self?.gradeFrontDocument() }
+        state.actions.pasteNotes = { [weak self] in self?.pasteClassNotes() }
+        state.actions.writeSuggestion = { [weak self] in self?.writeSuggestion() }
+        state.actions.nextSuggestion = { [weak self] in self?.suggestions.next(); self?.refreshSuggestionBar() }
+        state.actions.doneSuggestion = { [weak self] in self?.suggestions.markCurrentDone(); self?.refreshSuggestionBar() }
+        state.actions.toggleSuggestionDone = { [weak self] s in self?.suggestions.toggleDone(s); self?.refreshSuggestionBar() }
+        state.actions.useText = { [weak self] text in
+            try? text.write(to: Paths.current, atomically: true, encoding: .utf8)
+            self?.reloadOutput()
+        }
+        state.actions.syncCanvas = { [weak self] in self?.statusItem.status = .syncing; self?.sync.runNow() }
+        state.actions.syncCalendar = { [weak self] in self?.syncCalendar() }
+        state.actions.openSetup = { [weak self] in self?.setupWindow.show() }
+        state.actions.applySettings = { [weak self] s in self?.apply(s) }
+    }
+
+    private func publishState() {
+        state.reloadFiles()
+        state.suggestion = suggestions.current
+        state.suggestions = suggestions.items
+        state.isRecording = recorder.isRecording
+        switch statusItem.status {
+        case .idle: state.statusText = statusItem.isPlaying ? "Following your typing" : "Paused"
+        case .recording: state.statusText = statusItem.isClassRecording ? "Recording class…" : "Recording…"
+        case .thinking: state.statusText = "Working on it…"
+        case .syncing: state.statusText = "Syncing Canvas…"
+        case .error(let m): state.statusText = "Error: \(m)"
+        case .message(let m): state.statusText = m
+        }
+    }
+
     // MARK: Output text
 
     private func reloadOutput() {
@@ -96,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.isPlaying = true
         statusItem.status = .idle
         statusItem.regrow()
+        publishState()
     }
 
     private func restart() {
@@ -127,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .writeSuggestion: writeSuggestion()
         case .nextSuggestion: suggestions.next(); refreshSuggestionBar()
         case .doneSuggestion: suggestions.markCurrentDone(); refreshSuggestionBar()
+        case .openWindow: mainWindow.show()
         case .playPause: togglePlay()
         case .hide: toggleHidden()
         case .wordBack: guide.previousWord()
@@ -191,6 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         classStartedAt = nil
         statusItem.isClassRecording = false
         statusItem.status = .thinking
+        publishState()
         settings = Settings.load()
         pipeline.runClass(wav: wav, startedAt: startedAt, settings: settings) { [weak self] result in
             guard let self else { return }
@@ -242,6 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refreshSuggestionBar() {
         statusItem.suggestion = suggestions.current
+        publishState()
     }
 
     /// Turns the current suggestion into a finished writing piece via the normal cleanup path.
@@ -283,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.classStartedAt = isClass ? Date() : nil
                 self.statusItem.isClassRecording = isClass
                 self.statusItem.status = .recording
+                self.publishState()
             } catch {
                 self.statusItem.status = .error("Could not start recording: \(error.localizedDescription)")
             }
@@ -306,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         eventTap.capsLockAutoType = updated.capsLockAutoType
         statusItem.coverAppMenus = updated.coverAppMenus
         statusItem.lineChars = updated.lineChars
+        statusItem.appearance = updated.appearance
         sync.schedule(everyHours: updated.syncHours)
         LoginItem.apply(updated.launchAtLogin)
         statusItem.regrow()
@@ -350,6 +397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func start(_ mode: Pipeline.Mode) {
         statusItem.status = .thinking
+        publishState()
         settings = Settings.load()
         pipeline.run(mode, settings: settings) { [weak self] result in
             self?.finish(result)
@@ -361,6 +409,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .success: reloadOutput()
         case .failure(let error): statusItem.status = .error(error.localizedDescription)
         }
+        publishState()
     }
 
     // MARK: Sync

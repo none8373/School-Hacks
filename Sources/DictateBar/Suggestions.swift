@@ -42,6 +42,12 @@ final class SuggestionStore {
         save()
     }
 
+    func toggleDone(_ s: Suggestion) {
+        guard let i = items.firstIndex(where: { $0.id == s.id }) else { return }
+        items[i].done.toggle()
+        save()
+    }
+
     /// Adds new items, skipping ones with the same subject + title.
     func add(_ new: [Suggestion]) {
         for s in new where !items.contains(where: { $0.subject == s.subject && $0.title.lowercased() == s.title.lowercased() }) {

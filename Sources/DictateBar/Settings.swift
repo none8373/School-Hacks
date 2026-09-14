@@ -28,6 +28,7 @@ struct Settings: Codable, Equatable {
     var capsLockAutoType: Bool = true
     var launchAtLogin: Bool = false
     var setupShown: Bool = false
+    var appearance = Appearance()
     var syncHours: Double = 4
     var whisperPath: String = "/opt/homebrew/bin/whisper-cli"
     var claudePath: String = "~/.local/bin/claude"

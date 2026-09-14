@@ -18,6 +18,7 @@ It reads your own Canvas courses (assignments, rubrics, modules, readings, the t
 | **Calendar** | A "DictateBar" iCloud calendar gets due dates, class sessions with notes, and to-dos. |
 | **Language classes** | Essays and prompts come out in the target language; notes give vocabulary with English meanings. |
 | **Usage meter** | Tokens and runs per AI, today and this week, in the menu. |
+| **App window** `⌥O` | Home (live text you can edit, one-click actions, next suggestion), History of every run, Class notes, Suggestions, **Appearance** (text / typed / highlight / suggestion colors, font, size, plain / blurred / solid background, opacity, corner radius, width) and Settings. |
 
 Everything the AI produces is logged to `~/Documents/DictateBar/output/history.log`.
 

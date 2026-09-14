@@ -38,6 +38,7 @@ final class StatusItemController {
     var onGrade: (() -> Void)?
     var onSettings: (() -> Void)?
     var onSetup: (() -> Void)?
+    var onOpenWindow: (() -> Void)?
     var onClassRecord: (() -> Void)?
     var onPasteNotes: (() -> Void)?
     var onWriteSuggestion: (() -> Void)?
@@ -46,7 +47,17 @@ final class StatusItemController {
     var onToggleSuggestionBar: (() -> Void)?
     var onCalendarSync: (() -> Void)?
     var isClassRecording = false
-    var suggestionBarVisible = true
+    var suggestionBarVisible: Bool {
+        get { appearance.showSuggestion }
+        set { appearance.showSuggestion = newValue }
+    }
+    var appearance = Appearance() {
+        didSet {
+            overlay.apply(appearance)
+            regrow()
+            render()
+        }
+    }
     /// Shown in the status item (right of the notch) when set and visible.
     var suggestion: Suggestion? { didSet { render() } }
     private let classItem = NSMenuItem()
@@ -81,7 +92,7 @@ final class StatusItemController {
     private var statusChars = 40
     private var measureTimer: Timer?
     private let minOverlayChars = 15
-    private let charWidth: CGFloat = 7.2
+    private var charWidth: CGFloat { appearance.charWidth }
 
     private var usingOverlay: Bool { lineChars == 0 && overlayChars >= minOverlayChars }
 
@@ -152,6 +163,8 @@ final class StatusItemController {
     private func buildMenu() {
         statusLine.isEnabled = false
         menu.addItem(statusLine)
+        menu.addItem(.separator())
+        add(NSMenuItem(), title: "Open DictateBar", key: "o", action: #selector(openWindowTapped))
         menu.addItem(.separator())
 
         add(playPauseItem, title: "Pause", key: " ", action: #selector(playPauseTapped))
@@ -227,6 +240,7 @@ final class StatusItemController {
     @objc private func gradeTapped() { onGrade?() }
     @objc private func settingsTapped() { onSettings?() }
     @objc private func setupTapped() { onSetup?() }
+    @objc private func openWindowTapped() { onOpenWindow?() }
     @objc private func classTapped() { onClassRecord?() }
     @objc private func pasteNotesTapped() { onPasteNotes?() }
     @objc private func writeSuggestionTapped() { onWriteSuggestion?() }
@@ -245,7 +259,7 @@ final class StatusItemController {
 
     func render() {
         guard let button = item.button else { return }
-        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let font = appearance.font
 
         func styled(_ text: String, _ color: NSColor, background: NSColor? = nil) -> NSAttributedString {
             var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
@@ -268,17 +282,17 @@ final class StatusItemController {
 
         let body = NSMutableAttributedString()
         if case .message(let message) = status {
-            body.append(styled(String(message.prefix(max(effectiveLineChars, 12))), .labelColor))
+            body.append(styled(String(message.prefix(max(effectiveLineChars, 12))), appearance.text))
         } else if case .error(let message) = status {
-            body.append(styled(String(message.prefix(max(effectiveLineChars, 12))), .labelColor))
+            body.append(styled(String(message.prefix(max(effectiveLineChars, 12))), appearance.text))
         } else if !isHidden {
             if guide.isEmpty {
-                body.append(styled("(no text yet)", .secondaryLabelColor))
+                body.append(styled("(no text yet)", appearance.suggestion))
             } else {
                 let w = guide.window(chars: effectiveLineChars)
-                body.append(styled(w.typed, .tertiaryLabelColor))
-                body.append(styled(w.current, .white, background: .controlAccentColor))
-                body.append(styled(w.upcoming, .labelColor))
+                body.append(styled(w.typed, appearance.typed))
+                body.append(styled(w.current, appearance.highlightText, background: appearance.highlight))
+                body.append(styled(w.upcoming, appearance.text))
             }
         }
 
@@ -298,12 +312,7 @@ final class StatusItemController {
             }
             let left = NSMutableAttributedString(attributedString: prefix)
             left.append(body.attributedSubstring(from: NSRange(location: 0, length: cut)))
-            if let suggestionText {
-                let padding = max(1, limit - cut + 3)
-                left.append(styled(String(repeating: " ", count: padding), .clear))
-                left.append(suggestionText)
-            }
-            overlay.show(text: left, x: gap, on: screen)
+            overlay.show(text: left, trailing: suggestionText, x: gap, on: screen)
             // Right of the notch: only whole words, or nothing.
             var rightLength = min(body.length - cut, statusChars)
             if cut + rightLength < body.length {
@@ -337,8 +346,8 @@ extension StatusItemController {
             title = String(title.prefix(max(4, room - due.count - 1))) + "…"
         }
         let line = NSMutableAttributedString(string: "📌 ", attributes: [.font: font])
-        line.append(NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
-        line.append(NSAttributedString(string: due, attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+        line.append(NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: appearance.text]))
+        line.append(NSAttributedString(string: due, attributes: [.font: font, .foregroundColor: appearance.suggestion]))
         return line
     }
 }
