@@ -71,8 +71,11 @@ final class StatusItemController {
         item.button?.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "DictateBar")
         item.button?.imagePosition = .imageLeading
         buildMenu()
-        item.menu = menu
-        overlay.onClick = { [weak self] in self?.item.button?.performClick(nil) }
+        // Left click opens the app window; right click (or Control-click) shows the menu.
+        item.button?.target = self
+        item.button?.action = #selector(statusButtonClicked)
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        overlay.onClick = { [weak self] in self?.onOpenWindow?() }
         render()
         regrow()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -241,6 +244,18 @@ final class StatusItemController {
     @objc private func settingsTapped() { onSettings?() }
     @objc private func setupTapped() { onSetup?() }
     @objc private func openWindowTapped() { onOpenWindow?() }
+
+    @objc private func statusButtonClicked() {
+        let event = NSApp.currentEvent
+        let rightClick = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
+        if rightClick {
+            item.menu = menu
+            item.button?.performClick(nil)
+            item.menu = nil
+        } else {
+            onOpenWindow?()
+        }
+    }
     @objc private func classTapped() { onClassRecord?() }
     @objc private func pasteNotesTapped() { onPasteNotes?() }
     @objc private func writeSuggestionTapped() { onWriteSuggestion?() }
