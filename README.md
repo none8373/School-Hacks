@@ -1,4 +1,4 @@
-# DictateBar
+# School Hacks
 
 **A menu bar study assistant for Mac students.** Say what you need — "write my reply to the discussion post", "notes for the unit 3 test", "grade this" — and DictateBar turns it into text that lives in your menu bar and follows along as you type it into Google Docs, Canvas, or anywhere else.
 
