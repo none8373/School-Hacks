@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alerts.enabled = settings.classAlerts
         alerts.minutesBefore = settings.alertMinutes
         alerts.start()
-        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.publishState() }
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshSuggestionBar() }
         showSetupIfNeeded()
     }
 
@@ -341,7 +341,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: Suggestions
 
     private func refreshSuggestionBar() {
-        statusItem.suggestion = suggestions.current
+        let open = suggestions.openItems
+        statusItem.suggestion = open.first { $0.source == "canvas" } ?? suggestions.current
+        statusItem.classSuggestion = open.first { $0.source == "class" }
+        statusItem.scheduleInfo = Schedule.load()?.compact()
         publishState()
     }
 

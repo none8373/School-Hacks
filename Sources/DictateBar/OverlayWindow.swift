@@ -4,7 +4,7 @@ import AppKit
 /// menus and the notch) and shows the typing line, with the suggestion right-aligned.
 final class OverlayWindow: NSPanel {
     private let label = NSTextField(labelWithString: "")
-    private let trailing = NSTextField(labelWithString: "")
+    private let leading = NSTextField(labelWithString: "")
     private let blur = NSVisualEffectView()
     private let tint = NSView()
     private var fullHeight = false
@@ -40,13 +40,13 @@ final class OverlayWindow: NSPanel {
         tint.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(tint)
 
-        for field in [label, trailing] {
+        for field in [label, leading] {
             field.lineBreakMode = .byClipping
             field.maximumNumberOfLines = 1
             field.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(field)
         }
-        trailing.setContentCompressionResistancePriority(.required, for: .horizontal)
+        leading.setContentCompressionResistancePriority(.required, for: .horizontal)
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         NSLayoutConstraint.activate([
@@ -54,11 +54,11 @@ final class OverlayWindow: NSPanel {
             blur.topAnchor.constraint(equalTo: content.topAnchor), blur.bottomAnchor.constraint(equalTo: content.bottomAnchor),
             tint.leadingAnchor.constraint(equalTo: content.leadingAnchor), tint.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             tint.topAnchor.constraint(equalTo: content.topAnchor), tint.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 8),
+            leading.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 8),
+            leading.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: leading.trailingAnchor, constant: 12),
             label.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            trailing.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8),
-            trailing.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            trailing.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 12),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -8),
         ])
     }
 
@@ -68,7 +68,7 @@ final class OverlayWindow: NSPanel {
 
     func apply(_ appearance: Appearance) {
         label.font = appearance.font
-        trailing.font = appearance.font
+        leading.font = appearance.font
         contentView?.layer?.cornerRadius = appearance.background == .hideMenus ? 0 : appearance.cornerRadius
         fullHeight = appearance.background == .hideMenus
         tint.isHidden = appearance.background != .hideMenus
@@ -104,10 +104,11 @@ final class OverlayWindow: NSPanel {
         didSet { updateTint() }
     }
 
-    func show(text: NSAttributedString, trailing trailingText: NSAttributedString?, x: ClosedRange<CGFloat>, on screen: NSScreen) {
+    /// `info` sits at the left edge; `text` follows it and is clipped before the strip ends.
+    func show(text: NSAttributedString, info: NSAttributedString?, x: ClosedRange<CGFloat>, on screen: NSScreen) {
         label.attributedStringValue = text
-        trailing.attributedStringValue = trailingText ?? NSAttributedString()
-        trailing.isHidden = trailingText == nil
+        leading.attributedStringValue = info ?? NSAttributedString()
+        leading.isHidden = info == nil
         let menuBar = max(24, min(screen.frame.maxY - screen.visibleFrame.maxY, 44))
         let height: CGFloat = fullHeight ? menuBar : 22
         let y = screen.frame.maxY - menuBar + (menuBar - height) / 2

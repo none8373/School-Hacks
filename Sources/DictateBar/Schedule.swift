@@ -114,6 +114,19 @@ struct Schedule: Codable, Equatable {
         return s
     }
 
+    /// "Chem 9:17 · 12m left" for the menu bar info line.
+    func compact(at now: Date = Date()) -> String? {
+        guard cycleLabel(for: now) != nil else { return nil }
+        let f = DateFormatter(); f.dateFormat = "h:mm"
+        var parts: [String] = []
+        if let n = next(after: now) { parts.append("\(short(n.className)) \(f.string(from: n.start))") }
+        if let c = current(at: now) {
+            let left = Int(c.end.timeIntervalSince(now) / 60)
+            parts.append("\(left)m left")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     func short(_ course: String) -> String {
         course.split(separator: "-").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? course
     }

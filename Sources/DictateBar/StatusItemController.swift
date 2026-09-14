@@ -62,8 +62,10 @@ final class StatusItemController {
             render()
         }
     }
-    /// Shown in the status item (right of the notch) when set and visible.
+    /// Info bar at the left of the strip: Canvas assignment, class recommendation, next class.
     var suggestion: Suggestion? { didSet { render() } }
+    var classSuggestion: Suggestion? { didSet { render() } }
+    var scheduleInfo: String? { didSet { render() } }
     private let classItem = NSMenuItem()
     private let usageLine1 = NSMenuItem()
     private let usageLine2 = NSMenuItem()
@@ -347,27 +349,25 @@ final class StatusItemController {
             }
         }
 
-        let showSuggestion = suggestion != nil && suggestionBarVisible && status == .idle
+        let info = (suggestionBarVisible && status == .idle) ? infoBar(font: font) : nil
 
         if bandMode, !isHidden, let screen = button.window?.screen ?? NSScreen.screens.first {
             // Full-screen app, menu bar hidden: fill the black band on both sides of the notch.
-            let suggestionText = showSuggestion ? compactSuggestion(suggestion!, font: font, room: min(30, bandLeftChars / 3)) : nil
-            let (left, right) = split(prefix: prefix, body: body, leftChars: bandLeftChars - (suggestionText.map { $0.length + 3 } ?? 0),
-                                      rightChars: bandRightChars)
-            overlay.show(text: left, trailing: suggestionText, x: bandLeft, on: screen)
-            overlayRight.show(text: right, trailing: nil, x: bandRight, on: screen)
+            let leftChars = charsThatFit(width: bandLeft.upperBound - bandLeft.lowerBound, info: info)
+            let (left, right) = split(prefix: prefix, body: body, leftChars: leftChars, rightChars: bandRightChars)
+            overlay.show(text: left, info: info, x: bandLeft, on: screen)
+            overlayRight.show(text: right, info: nil, x: bandRight, on: screen)
             button.attributedTitle = NSAttributedString()
             return
         }
         overlayRight.orderOut(nil)
 
         if usingOverlay, !isHidden, menuBarVisible, let screen = button.window?.screen ?? NSScreen.screens.first {
-            // Left strip gets the prefix, the first part of the text and, at its right end, the
-            // suggestion; the status item shows whole words that fit right of the notch.
-            let suggestionText = showSuggestion ? compactSuggestion(suggestion!, font: font, room: min(30, overlayChars / 3)) : nil
-            let (left, right) = split(prefix: prefix, body: body, leftChars: overlayChars - (suggestionText.map { $0.length + 3 } ?? 0),
-                                      rightChars: statusChars)
-            overlay.show(text: left, trailing: suggestionText, x: gap, on: screen)
+            // Left strip: info bar, then as much text as fits before the notch (whole words);
+            // the status item shows whole words that fit right of the notch.
+            let leftChars = charsThatFit(width: gap.upperBound - gap.lowerBound, info: info)
+            let (left, right) = split(prefix: prefix, body: body, leftChars: leftChars, rightChars: statusChars)
+            overlay.show(text: left, info: info, x: gap, on: screen)
             button.attributedTitle = right
         } else {
             overlay.orderOut(nil)
@@ -401,23 +401,37 @@ extension StatusItemController {
         return (left, right)
     }
 
-    /// "📌 ENG: HW 9/10 · Fri" squeezed into the space right of the notch.
-    fileprivate func compactSuggestion(_ s: Suggestion, font: NSFont, room: Int) -> NSAttributedString {
-        let room = max(8, room - 2)
-        var due = ""
-        if let d = s.due {
-            let inF = DateFormatter(); inF.dateFormat = "yyyy-MM-dd"
-            let outF = DateFormatter(); outF.dateFormat = "EEE"
-            if let date = inF.date(from: d) { due = " · " + outF.string(from: date) }
+    /// Characters of guide text that fit in a strip of `width` points after the info bar,
+    /// measured in points so nothing runs under the notch.
+    fileprivate func charsThatFit(width: CGFloat, info: NSAttributedString?) -> Int {
+        let infoWidth = info.map { $0.size().width + 12 } ?? 0
+        return max(0, Int((width - 16 - infoWidth) / charWidth))
+    }
+
+    /// "📌 ENG: HW 9/10 · Fri  ·  📝 Study for safety quiz  ·  ⏭ Chem 9:17 · 12m left"
+    fileprivate func infoBar(font: NSFont) -> NSAttributedString? {
+        let line = NSMutableAttributedString()
+        func add(_ icon: String, _ text: String, _ tail: String = "") {
+            if line.length > 0 { line.append(NSAttributedString(string: "  ·  ", attributes: [.font: font, .foregroundColor: appearance.suggestion])) }
+            line.append(NSAttributedString(string: icon + " ", attributes: [.font: font]))
+            line.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: appearance.text]))
+            if !tail.isEmpty { line.append(NSAttributedString(string: tail, attributes: [.font: font, .foregroundColor: appearance.suggestion])) }
         }
-        var title = s.title
-        if title.count + due.count > room {
-            title = String(title.prefix(max(4, room - due.count - 1))) + "…"
-        }
-        let line = NSMutableAttributedString(string: "📌 ", attributes: [.font: font])
-        line.append(NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: appearance.text]))
-        line.append(NSAttributedString(string: due, attributes: [.font: font, .foregroundColor: appearance.suggestion]))
-        return line
+        if let s = suggestion { add("📌", trim(s.title, 26), dueTag(s.due)) }
+        if let c = classSuggestion, c.id != suggestion?.id { add("📝", trim(c.title, 26), dueTag(c.due)) }
+        if let sched = scheduleInfo { add("⏭", sched) }
+        return line.length > 0 ? line : nil
+    }
+
+    private func trim(_ s: String, _ max: Int) -> String {
+        s.count > max ? String(s.prefix(max - 1)) + "…" : s
+    }
+
+    private func dueTag(_ due: String?) -> String {
+        guard let due else { return "" }
+        let inF = DateFormatter(); inF.dateFormat = "yyyy-MM-dd"
+        let outF = DateFormatter(); outF.dateFormat = "EEE"
+        return inF.date(from: due).map { " · " + outF.string(from: $0) } ?? ""
     }
 }
 
