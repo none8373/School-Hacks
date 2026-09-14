@@ -19,8 +19,9 @@ final class OverlayWindow: NSPanel {
         hidesOnDeactivate = false
         ignoresMouseEvents = false
         isMovableByWindowBackground = false
-        // A few notches above the menu bar: some apps (Electron) paint their own band at +2.
-        level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 5)
+        // Above the menu bar (including the one macOS slides in over full-screen apps) but
+        // below pop-up menus, so dropdowns still open on top of the strip.
+        level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.popUpMenuWindow)) - 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
 
         let content = NSView()

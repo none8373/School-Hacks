@@ -99,19 +99,20 @@ final class StatusItemController {
     /// …unless the Mac has a notch: then the empty black band at the top is ours to fill.
     private var bandMode = false
     private var visibilityTimer: Timer?
+    private var pendingState: (visible: Bool, band: Bool)?
+    private var pendingCount = 0
     private var overlayChars = 0
     private var statusChars = 40
     private var measureTimer: Timer?
     private let minOverlayChars = 15
     private var charWidth: CGFloat { appearance.charWidth }
 
-    private var usingOverlay: Bool { lineChars == 0 && overlayChars >= minOverlayChars }
+    private var usingOverlay: Bool { overlayChars >= minOverlayChars }
 
     /// The line flows left-of-notch first, then continues in the status item on the right.
     private var effectiveLineChars: Int {
-        if bandMode { return bandLeftChars + bandRightChars }
-        if lineChars > 0 { return lineChars }
-        return usingOverlay ? overlayChars + statusChars : statusChars
+        let auto = bandMode ? bandLeftChars + bandRightChars : overlayChars
+        return lineChars > 0 ? min(lineChars, max(auto, minOverlayChars)) : auto
     }
 
     // MARK: Full-screen band (notched Macs)
@@ -132,7 +133,6 @@ final class StatusItemController {
 
     /// Re-measure soon (new text, screen change, another app came to the front).
     func regrow() {
-        guard lineChars == 0 else { return }
         measureTimer?.invalidate()
         measureTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
             self?.measure()
@@ -150,16 +150,23 @@ final class StatusItemController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 let screen = self.item.button?.window?.screen ?? NSScreen.screens.first
-                // In a full-screen app the revealed menu bar is drawn above us, so the strip only
-                // lives on the black notch band and disappears while the bar is slid in.
-                let visible = !fullScreen
+                // Full-screen app: bar hidden -> fill the black band; bar slid in -> normal strip
+                // over the bar (we sit above it). Require two consecutive identical readings so
+                // the slide animation can't make the strip flicker.
+                let visible = !fullScreen || barShown
                 let band = fullScreen && !barShown && (screen.map { self.measureBand(on: $0) } ?? false)
+                if let pending = self.pendingState, pending.visible == visible, pending.band == band {
+                    self.pendingCount += 1
+                } else {
+                    self.pendingState = (visible, band)
+                    self.pendingCount = 1
+                }
+                guard self.pendingCount >= 2, visible != self.menuBarVisible || band != self.bandMode else { return }
                 let dark: NSAppearance? = fullScreen ? NSAppearance(named: .darkAqua) : nil
                 self.overlay.appearance = dark
                 self.overlayRight.appearance = dark
-                self.overlay.forceBlack = fullScreen
-                self.overlayRight.forceBlack = fullScreen
-                guard visible != self.menuBarVisible || band != self.bandMode else { return }
+                self.overlay.forceBlack = band
+                self.overlayRight.forceBlack = band
                 self.menuBarVisible = visible
                 self.bandMode = band
                 self.render()
@@ -170,27 +177,16 @@ final class StatusItemController {
 
     private func measure() {
         guard let screen = item.button?.window?.screen ?? NSScreen.screens.first else { return }
-        // Step 1: shrink to icon-only so macOS shows every other icon; the space left
-        // between the notch and our icon is then exactly what we may use on the right.
-        statusChars = 0
-        render()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        let ourMinX = item.button?.window?.frame.minX
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
-            let ourMinX = self.item.button?.window?.frame.minX
-            let rightArea = screen.auxiliaryTopRightArea
-            DispatchQueue.global(qos: .userInitiated).async {
-                let gap = MenuBarSpace.freeGap(on: screen, ourItemMinX: ourMinX, coverAppMenus: self.coverAppMenus)
-                let overlayChars = Int((gap.upperBound - gap.lowerBound - 16) / self.charWidth)
-                var statusChars = 0
-                if let rightArea, let ourMinX {
-                    statusChars = max(0, Int((ourMinX - rightArea.minX - 20) / self.charWidth))
-                }
-                DispatchQueue.main.async {
-                    self.gap = gap
-                    self.overlayChars = overlayChars
-                    self.statusChars = statusChars
-                    self.render()
-                }
+            let gap = MenuBarSpace.freeGap(on: screen, ourItemMinX: ourMinX, coverAppMenus: self.coverAppMenus)
+            let overlayChars = Int((gap.upperBound - gap.lowerBound - 16) / self.charWidth)
+            DispatchQueue.main.async {
+                guard gap != self.gap || overlayChars != self.overlayChars else { return }
+                self.gap = gap
+                self.overlayChars = overlayChars
+                self.render()
             }
         }
     }
@@ -366,13 +362,13 @@ final class StatusItemController {
             // Left strip: info bar, then as much text as fits before the notch (whole words);
             // the status item shows whole words that fit right of the notch.
             let leftChars = charsThatFit(width: gap.upperBound - gap.lowerBound, info: info)
-            let (left, right) = split(prefix: prefix, body: body, leftChars: leftChars, rightChars: statusChars)
+            let (left, _) = split(prefix: prefix, body: body, leftChars: leftChars, rightChars: 0)
             overlay.show(text: left, info: info, x: gap, on: screen)
-            button.attributedTitle = right
+            button.attributedTitle = NSAttributedString()
         } else {
             overlay.orderOut(nil)
-            prefix.append(body)
-            button.attributedTitle = prefix
+            // No room for a strip: keep the status item to the icon plus a short state marker.
+            button.attributedTitle = isHidden ? NSAttributedString() : prefix
         }
     }
 }
