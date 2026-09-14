@@ -29,6 +29,9 @@ struct Settings: Codable, Equatable {
     var launchAtLogin: Bool = false
     var setupShown: Bool = false
     var appearance = Appearance()
+    var briefEnabled: Bool = true
+    var briefHour: Int = 7
+    var briefMinute: Int = 0
     var syncHours: Double = 4
     var whisperPath: String = "/opt/homebrew/bin/whisper-cli"
     var claudePath: String = "~/.local/bin/claude"

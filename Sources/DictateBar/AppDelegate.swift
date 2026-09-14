@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var accessibilityTimer: Timer?
     private let suggestions = SuggestionStore()
     private let calendar = CalendarSync()
+    private let briefScheduler = BriefScheduler()
     private var classStartedAt: Date?
     private var lastClassNotes: String?
     private let state = AppState()
@@ -77,7 +78,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sync.onFinished = { [weak self] result in self?.syncFinished(result) }
         sync.schedule(everyHours: settings.syncHours)
         LoginItem.apply(settings.launchAtLogin)
+        briefScheduler.onDue = { [weak self] in self?.generateBrief() }
+        briefScheduler.configure(enabled: settings.briefEnabled, hour: settings.briefHour, minute: settings.briefMinute)
         showSetupIfNeeded()
+    }
+
+    /// The daily brief: runs on schedule or from the Morning brief page.
+    private func generateBrief() {
+        guard !isBusy else { return }
+        start(.brief)
     }
 
     /// First launch, or anything essential missing: open the setup window.
@@ -112,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.actions.syncCalendar = { [weak self] in self?.syncCalendar() }
         state.actions.openSetup = { [weak self] in self?.setupWindow.show() }
         state.actions.applySettings = { [weak self] s in self?.apply(s) }
+        state.actions.generateBrief = { [weak self] in self?.generateBrief() }
     }
 
     private func publishState() {
@@ -355,6 +365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.appearance = updated.appearance
         sync.schedule(everyHours: updated.syncHours)
         LoginItem.apply(updated.launchAtLogin)
+        briefScheduler.configure(enabled: updated.briefEnabled, hour: updated.briefHour, minute: updated.briefMinute)
         statusItem.regrow()
     }
 

@@ -7,12 +7,14 @@ final class Pipeline {
         case clean(String)   // transcript or pasted text
         case notes(String)   // optional extra request text
         case grade(String)   // the document to grade
+        case brief           // the morning brief across all classes
 
         var label: String {
             switch self {
             case .clean: return "clean"
             case .notes: return "notes"
             case .grade: return "grade"
+            case .brief: return "brief"
             }
         }
 
@@ -21,6 +23,7 @@ final class Pipeline {
             case .clean: return Paths.cleanPrompt
             case .notes: return Paths.notesPrompt
             case .grade: return Paths.gradePrompt
+            case .brief: return Paths.briefPrompt
             }
         }
 
@@ -29,7 +32,17 @@ final class Pipeline {
             case .clean(let text): return "TRANSCRIPT:\n\n" + text
             case .notes(let extra): return extra.isEmpty ? "Produce the notes for the current assignment now." : "REQUEST:\n\n" + extra
             case .grade(let doc): return "STUDENT DOCUMENT:\n\n" + doc
+            case .brief: return "Produce today's morning brief now."
             }
+        }
+
+        /// Briefs are also kept by date so past mornings stay readable.
+        var archiveURL: URL? {
+            if case .brief = self {
+                let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+                return Paths.briefs.appendingPathComponent("\(f.string(from: Date())).md")
+            }
+            return nil
         }
     }
 
@@ -182,6 +195,7 @@ final class Pipeline {
             let instructions = try loadInstructions(promptFile: mode.promptFile, settings: settings)
             let output = try callAI(instructions: instructions, input: mode.input, settings: settings)
             try writeOutput(output)
+            if let archive = mode.archiveURL { try? output.write(to: archive, atomically: true, encoding: .utf8) }
             History.record(mode: mode.label, provider: provider, input: mode.input, output: output,
                            error: nil, seconds: Date().timeIntervalSince(started))
             DispatchQueue.main.async { completion(.success(output)) }

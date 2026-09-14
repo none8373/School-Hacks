@@ -4,12 +4,13 @@ import SwiftUI
 /// The full app window: Home, History, Class notes, Suggestions, Appearance, Settings.
 final class MainWindowController {
     enum Page: String, CaseIterable, Identifiable {
-        case home = "Home", history = "History", classes = "Class notes", suggestions = "Suggestions",
+        case home = "Home", brief = "Morning brief", history = "History", classes = "Class notes", suggestions = "Suggestions",
              appearance = "Appearance", settings = "Settings"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .home: return "house"
+            case .brief: return "sunrise"
             case .history: return "clock"
             case .classes: return "book"
             case .suggestions: return "pin"
@@ -61,6 +62,7 @@ private struct MainView: View {
         } detail: {
             switch selection.page {
             case .home: HomeView(state: state)
+            case .brief: BriefView(state: state)
             case .history: HistoryView(state: state)
             case .classes: ClassesView(state: state)
             case .suggestions: SuggestionsView(state: state)
@@ -142,6 +144,56 @@ private struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 60)
         }
+    }
+}
+
+// MARK: - Morning brief
+
+private struct BriefView: View {
+    @ObservedObject var state: AppState
+    @State private var settings = Settings.load()
+    @State private var selected: URL?
+
+    private var today: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Toggle("Every morning at", isOn: $settings.briefEnabled)
+                Stepper(String(format: "%d:%02d", settings.briefHour, settings.briefMinute), value: $settings.briefHour, in: 4...11)
+                Stepper("min", value: $settings.briefMinute, in: 0...55, step: 5).labelsHidden()
+                Text(String(format: "%02d", settings.briefMinute)).monospacedDigit()
+                Spacer()
+                Button("Generate now") { state.actions.generateBrief() }
+            }
+            Text("Reads your latest class notes, suggestions and Canvas due dates, then pulls the exact pages or units mentioned (\"reading quiz on pages 40–80\") from the synced files so you can review before class.")
+                .font(.caption).foregroundStyle(.secondary)
+            HSplitView {
+                List(state.briefs, selection: $selected) { b in
+                    HStack {
+                        Text(b.name)
+                        if b.name == today { Text("today").font(.caption).foregroundStyle(.green) }
+                    }.tag(b.id)
+                }
+                .frame(minWidth: 150, maxWidth: 200)
+                ScrollView {
+                    if let b = state.briefs.first(where: { $0.id == selected }) ?? state.briefs.first {
+                        Text(b.text).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    } else {
+                        Text("No brief yet. It runs on its own each morning, or press Generate now.").foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .padding(16)
+        .onAppear { selected = state.briefs.first?.id }
+        .onChange(of: settings) { _, new in new.save(); state.actions.applySettings(new) }
     }
 }
 

@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
     @Published var usageClaude = ""
     @Published var history: [HistoryEntry] = []
     @Published var classNotes: [ClassNote] = []
+    @Published var briefs: [ClassNote] = []      // reuse: subject = date, text = brief
 
     struct Actions {
         var record: () -> Void = {}
@@ -42,6 +43,7 @@ final class AppState: ObservableObject {
         var syncCalendar: () -> Void = {}
         var openSetup: () -> Void = {}
         var applySettings: (Settings) -> Void = { _ in }
+        var generateBrief: () -> Void = {}
     }
     var actions = Actions()
 
@@ -51,6 +53,15 @@ final class AppState: ObservableObject {
         usageClaude = Usage.summary(provider: "claude")
         history = AppState.parseHistory()
         classNotes = AppState.loadClassNotes()
+        briefs = AppState.loadBriefs()
+    }
+
+    private static func loadBriefs() -> [ClassNote] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: Paths.briefs, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.pathExtension == "md" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            .map { ClassNote(id: $0, subject: $0.deletingPathExtension().lastPathComponent, name: $0.deletingPathExtension().lastPathComponent,
+                             text: (try? String(contentsOf: $0, encoding: .utf8)) ?? "") }
     }
 
     private static func parseHistory() -> [HistoryEntry] {
