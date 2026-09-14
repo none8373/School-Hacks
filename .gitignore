@@ -5,6 +5,7 @@ library/
 output/
 recordings/
 debug.log
+HANDOFF.md
 
 # build products
 .build/

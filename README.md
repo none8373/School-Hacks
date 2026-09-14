@@ -1,80 +1,96 @@
-# School Hacks
+# School Hacks (DictateBar)
 
-**A menu bar study assistant for Mac students.** Say what you need — "write my reply to the discussion post", "notes for the unit 3 test", "grade this" — and DictateBar turns it into text that lives in your menu bar and follows along as you type it into Google Docs, Canvas, or anywhere else.
+A little helper that lives in your Mac's menu bar. You talk to it (or paste text), it looks at your Canvas classes, and it gives you back words to type, notes to study, a grade before your teacher sees it, and a heads-up every morning about what's due.
 
-It reads your own Canvas courses (assignments, rubrics, modules, readings, the textbook PDF), can record and organize a whole class, keeps a to-do suggestion in the bar, and puts everything on an iCloud calendar. Speech recognition runs on your Mac; the AI runs on a ChatGPT or Claude account you already have — no API keys, no subscriptions to anything new.
+Speech never leaves your Mac. The "AI" part uses a ChatGPT or Claude account you already have. Nothing to pay for.
 
-## What it does
+---
 
-| | |
+## What it can do
+
+| You do | It does |
 |---|---|
-| **Type-along line** | The text to type sits in the menu bar. The next letter is highlighted; typed letters dim. Space always jumps to the next word, so typos never trap you. **Caps Lock** turns on auto-type: every key you press becomes the next correct character. |
-| **Record** `⌥R` | Speak a request. Filler words, "no wait, scratch that", and side chatter are removed; spoken instructions ("make it formal") are followed, not typed. |
-| **Clipboard prompt** `⌥V` | Same thing from copied text. |
-| **Notes** `⌥N` | Finds the selected class's current test or assignment on Canvas, works out which units it covers, and builds study notes from those modules' pages and files. |
-| **Grade** `⌥G` | Copies the document you're in and grades it against the assignment's Canvas rubric at your grade level: score per criterion, three fixes, what's missing. |
-| **Record class** `⌥C` | Records the whole period, transcribes it, writes organized notes, pulls out homework and test dates the teacher mentioned, and saves what was said about each Canvas assignment. `⌥P` pastes the notes anywhere. |
-| **Suggestion** | The next thing worth doing (from class + Canvas work due soon) sits at the right of the line. `⌥W` writes it, `⌥J` next, `⌥D` done. |
-| **Schedule** | Type your school's name: the AI searches the web for this year's no-school days and the bell schedule / day rotation. Set "Today is Day N" once. Fill in which class is in each period from a grid of your Canvas courses (or import your timetable PDF). The app shows today's periods with what's now and next, notifies you a few minutes before each class, uses the current class as context for every job, and picks it automatically when you record a class. |
-| **Morning brief** | Every morning (time of your choice) it reads the latest class notes, to-dos and Canvas due dates, finds things like "reading quiz tomorrow on pages 40–80", pulls those pages from the synced PDF text, and writes a five-minute review. Its own page in the app; past briefs kept. |
-| **Calendar** | A "DictateBar" iCloud calendar gets due dates, class sessions with notes, and to-dos. |
-| **Language classes** | Essays and prompts come out in the target language; notes give vocabulary with English meanings. |
-| **Usage meter** | Tokens and runs per AI, today and this week, in the menu. |
-| **App window** `⌥O` | Home (live text you can edit, one-click actions, next suggestion), History of every run, Class notes, Suggestions, **Appearance** (text / typed / highlight / suggestion colors, font, size, plain / blurred / solid background, opacity, corner radius, width) and Settings. |
+| Press **⌥R**, talk, press **⌥R** again | Turns what you said into clean text and shows it in the menu bar. As you type it into Google Docs, the next letter lights up and follows you. Spelling mistake? Hit space and it moves to the next word. |
+| Turn on **Caps Lock** and mash any keys | It types the correct text for you, one letter per key. |
+| Press **⌥N** | Study notes for whatever test or assignment is next in your class, built from the actual unit pages and PDFs in Canvas. |
+| Press **⌥G** while in a doc | Grades your document with the teacher's rubric from Canvas, tells you what to fix. |
+| Press **⌥C** when class starts, again when it ends | Records the whole class, writes neat notes, and pulls out the homework and test dates the teacher mentioned. **⌥P** pastes the notes anywhere. |
+| Nothing | Every morning it writes a 5-minute brief: what's due today and tomorrow, and the exact pages to review if there's a quiz. |
+| Look at the bar | `📌` next assignment · `📝` what the teacher asked for in class · `⏭` your next class and minutes left. **⌥W** writes the suggested assignment for you. |
+| Press **⌥O** or click the mic | Opens the app: history, class notes, schedule, morning briefs, colours, settings. |
 
-Everything the AI produces is logged to `~/Documents/DictateBar/output/history.log`.
+---
 
-## Install
+## Install (about 10 minutes, one time)
 
-Requirements: macOS 14+, [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/) (`xcode-select --install`), [Homebrew](https://brew.sh).
+**You need:** a Mac on macOS 14 or newer, and either the **Codex** app signed in with your ChatGPT account, or **Claude Code** signed in with your Claude account.
 
-```bash
-git clone https://github.com/none8373/School-Hacks.git
-cd DictateBar
-scripts/build_app.sh
-```
+1. Open **Terminal** (press ⌘Space, type `Terminal`, Enter).
+2. Paste this and press Enter. It installs Apple's free developer tools if you don't have them (a dialog may pop up — click Install, then wait):
+   ```bash
+   xcode-select --install
+   ```
+3. Paste this and press Enter. It installs Homebrew, a tool that installs other tools:
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+4. Paste this and press Enter. It downloads School Hacks, builds it, and opens it:
+   ```bash
+   git clone https://github.com/none8373/School-Hacks.git ~/School-Hacks && cd ~/School-Hacks && scripts/build_app.sh
+   ```
+5. A **Set up DictateBar** window appears. Go down the list — each row has a button:
+   - **Speech recognition** → *Install with Homebrew* (1–3 min)
+   - **Speech model** → *Download* (150 MB)
+   - **AI** → pick Codex or Claude → *Test*. If it says not signed in: open the Codex app and log in (or run `claude auth login` in Terminal).
+   - **Canvas** → paste your school's Canvas address and a token. To get a token: Canvas → your picture → **Settings** → scroll to *Approved Integrations* → **+ New Access Token** → Generate → copy. Then *Save & sync courses*.
+   - **Microphone / Accessibility / Calendar** → *Allow*. Accessibility opens System Settings — flip the switch next to DictateBar.
+6. Click the mic icon in the menu bar → **Settings** → choose your class → done.
 
-That builds the app into `~/Applications/DictateBar.app` and opens it. A **Setup** window walks you through the rest, with a button for each step:
+Press **⌥R** and say something.
 
-1. **whisper.cpp** — installed with Homebrew (speech recognition, on-device).
-2. **Speech model** — a ~150 MB download.
-3. **AI** — pick Codex (uses the ChatGPT account you're signed into in the Codex app) or Claude (`claude auth login` once). Click *Test*.
-4. **Canvas** (optional) — paste your school's Canvas address and an access token (Canvas → Account → Settings → *New Access Token*). Courses sync in the background and every few hours after that.
-5. **Permissions** — Microphone, Accessibility (for hotkeys and following your typing), Calendar (optional).
+### Set up your schedule (5 minutes, optional but worth it)
+Click the mic → **Schedule**:
+1. Type your school's name and state → **Look up calendar & bell schedule**. It searches the web for your no-school days and period times.
+2. Pick **Today is Day …** (your rotation day). You only do this once; it counts forward from there.
+3. **Edit which class is in each period** and pick your classes from the grid. Or *Import my timetable PDF*.
 
-Then choose your class in **Settings…** and press `⌥R`.
+Now the bar shows your next class, you get a ping 5 minutes before each one, and recording a class files itself under the right course automatically.
 
-## Hotkeys
+---
 
-`⌥R` record · `⌥C` record class · `⌥P` paste class notes · `⌥V` clipboard prompt · `⌥N` notes · `⌥G` grade · `⌥W` write suggestion · `⌥J` / `⌥D` next / done · `⌥Space` play / pause · `⌥H` hide · `⌥←` `⌥→` word · `⌥↑` `⌥↓` sentence
+## Keys
 
-`⌥←/→` normally jumps by word in text editors; switch the modifier to Control+Option in Settings if that bothers you.
+| Key | Does |
+|---|---|
+| ⌥R | record / stop |
+| ⌥V | use copied text as the request |
+| ⌥N | notes for the next test/assignment |
+| ⌥G | grade the document I'm in |
+| ⌥C | record class / stop |
+| ⌥P | paste class notes |
+| ⌥W / ⌥J / ⌥D | write the suggestion / next / done |
+| ⌥Space | pause following my typing |
+| ⌥H | hide / show the bar |
+| ⌥← ⌥→ ⌥↑ ⌥↓ | move by word / sentence |
+| ⌥O | open the app |
 
-## Where things live
+⌥← / ⌥→ normally jump words in text editors. If you miss that, switch the modifier to Control+Option in Settings.
 
-```
-~/Documents/DictateBar/          your data (never leaves your Mac except to the AI you chose)
-  library/canvas/<course>/        synced assignments, modules, pages, files, extracted text
-  library/classes/<course>/       class transcripts and notes
-  library/drive/                  drop Google Drive exports here
-  output/current.md               what the menu bar shows — edit it by hand any time
-  output/history.log              every AI run
-  .env                            your Canvas token (chmod 600)
-~/Library/Application Support/DictateBar/models/   whisper model
-```
+---
 
-Prompts the AI follows are in [`prompts/`](prompts) — edit them to change the voice, format, or rules.
+## Where your stuff goes
+Everything is in `~/Documents/DictateBar` — your synced Canvas material, class notes, briefs, and a `history.log` of every AI run. Your Canvas token sits in `.env` there. Nothing is uploaded anywhere except to the AI you chose, and it only sees your library folder read-only.
 
-## How it works
+## Make it yours
+Click the mic → **Appearance**: colours, font, size, background. The AI's instructions are plain text in the `prompts/` folder — edit them if you want a different voice or format.
 
-Swift menu bar app (no Xcode project — `swift build`) · [whisper.cpp](https://github.com/ggerganov/whisper.cpp) for transcription · [Codex CLI](https://github.com/openai/codex) or [Claude Code](https://claude.ai/code) run non-interactively with read-only access to your library folder · a small Python script for the Canvas API · EventKit for the calendar. The menu bar line is a transparent panel floating over the bar; it measures the free space with Accessibility and never pushes other icons out. In a full-screen app on a notched Mac it fills the empty black band on both sides of the notch, and steps aside when the menu bar slides in.
+## Something's off?
+- Click the mic → **History** to see what the AI got and what it answered.
+- Mic menu → **Setup…** re-checks everything.
+- Recording says "whisper failed"? Setup → Speech model → Download again.
+- Bar disappeared? **⌥H**.
 
-See [SPEC.md](SPEC.md) for the design.
+## Fair use
+This can write and grade schoolwork. What you hand in is on you; your school's rules apply. It's best as a way to get unstuck, study from your own materials, and stay on top of what's due.
 
-## A note on use
-
-DictateBar can write and grade schoolwork. What you hand in is your call, and your school's rules apply. It's most useful as a way to get unstuck, study from your own materials, and keep track of what's due.
-
-## License
-
-MIT
+MIT licensed. Built with [whisper.cpp](https://github.com/ggerganov/whisper.cpp), [Codex CLI](https://github.com/openai/codex) / [Claude Code](https://claude.ai/code), Swift.
