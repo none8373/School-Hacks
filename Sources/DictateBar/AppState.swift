@@ -48,6 +48,8 @@ final class AppState: ObservableObject {
         var generateBrief: () -> Void = {}
         var importSchedule: ([URL]) -> Void = { _ in }
         var setCycleDay: (String) -> Void = { _ in }
+        var lookupSchool: (String) -> Void = { _ in }
+        var saveSchedule: (Schedule) -> Void = { _ in }
     }
     var actions = Actions()
 

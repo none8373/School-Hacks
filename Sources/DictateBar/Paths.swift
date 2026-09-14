@@ -33,6 +33,7 @@ enum Paths {
     static let classPrompt = resources.appendingPathComponent("prompts/class.md")
     static let briefPrompt = resources.appendingPathComponent("prompts/brief.md")
     static let schedulePrompt = resources.appendingPathComponent("prompts/schedule.md")
+    static let schoolPrompt = resources.appendingPathComponent("prompts/school.md")
     static let pdfTextScript = resources.appendingPathComponent("sync/pdf_text.py")
     static let scheduleDocs = library.appendingPathComponent("schedule")
     static let briefs = library.appendingPathComponent("briefs")

@@ -112,6 +112,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func lookupSchool(_ name: String) {
+        guard !isBusy, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        statusItem.status = .thinking
+        state.scheduleStatus = "Searching the web for \(name)'s calendar and bell schedule (about a minute)…"
+        settings = Settings.load()
+        pipeline.lookupSchool(name, settings: settings) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let schedule):
+                self.alerts.schedule = schedule
+                self.statusItem.status = .message("Found \(schedule.school ?? name): \(schedule.holidays.count) no-school days, \(schedule.periods.count) periods")
+                self.state.scheduleStatus = (schedule.notes ?? "") + (schedule.sources.map { "  Sources: " + $0.joined(separator: " ") } ?? "")
+            case .failure(let error):
+                self.statusItem.status = .error("Lookup: \(error.localizedDescription)")
+                self.state.scheduleStatus = error.localizedDescription
+            }
+            self.publishState()
+        }
+    }
+
+    private func saveSchedule(_ schedule: Schedule) {
+        schedule.save()
+        alerts.schedule = schedule
+        refreshSuggestionBar()
+    }
+
     private func setCycleDay(_ label: String) {
         guard var schedule = Schedule.load() else { return }
         schedule.setToday(label)
@@ -167,6 +193,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.actions.generateBrief = { [weak self] in self?.generateBrief() }
         state.actions.importSchedule = { [weak self] files in self?.importSchedule(files) }
         state.actions.setCycleDay = { [weak self] label in self?.setCycleDay(label) }
+        state.actions.lookupSchool = { [weak self] name in self?.lookupSchool(name) }
+        state.actions.saveSchedule = { [weak self] s in self?.saveSchedule(s) }
     }
 
     private func publishState() {

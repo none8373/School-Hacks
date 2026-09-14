@@ -156,71 +156,90 @@ private struct ScheduleView: View {
     @ObservedObject var state: AppState
     @State private var settings = Settings.load()
     @State private var now = Date()
+    @State private var school = Schedule.load()?.school ?? ""
+    @State private var editing = false
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Button("Add schedule PDF…") { pickFiles() }
-                Text("Bell schedule, cycle-day calendar, your timetable — one or several files. The AI reads them and builds the schedule; re-add any time to replace it.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if !state.scheduleStatus.isEmpty {
-                Text(state.scheduleStatus).font(.caption).foregroundStyle(.secondary)
-            }
-
-            if let schedule = state.schedule {
-                GroupBox {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GroupBox("1. Your school") {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(headline(schedule)).font(.title3.bold())
-                            Text(schedule.summary(at: now)).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Picker("Today is", selection: Binding(
-                            get: { schedule.cycleLabel(for: now) ?? schedule.cycleLabels.first ?? "" },
-                            set: { state.actions.setCycleDay($0) })) {
-                            ForEach(schedule.cycleLabels, id: \.self) { Text("Day \($0)").tag($0) }
-                        }.frame(width: 160)
+                        TextField("School or district name, and state", text: $school)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { state.actions.lookupSchool(school) }
+                        Button("Look up calendar & bell schedule") { state.actions.lookupSchool(school) }
+                            .disabled(school.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    Text("Searches the web for this year's no-school days and the period times / day rotation. Re-run any time; your class assignments are kept.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if !state.scheduleStatus.isEmpty {
+                        Text(state.scheduleStatus).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     }
                 }
 
-                let slots = schedule.slots(for: now)
-                if slots.isEmpty {
-                    Text("No classes today.").foregroundStyle(.secondary)
-                } else {
-                    List(slots, id: \.start) { slot in
+                if let schedule = state.schedule {
+                    GroupBox("2. Today") {
                         HStack {
-                            Text(time(slot.start) + " – " + time(slot.end)).monospacedDigit().frame(width: 120, alignment: .leading)
-                            Text(slot.period.name).frame(width: 110, alignment: .leading).foregroundStyle(.secondary)
-                            Text(slot.className == "Free" ? "Free" : schedule.short(slot.className)).bold(isCurrent(slot))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(headline(schedule)).font(.title3.bold())
+                                Text(schedule.summary(at: now)).foregroundStyle(.secondary)
+                                Text("Set this once. It counts school days forward from here, skipping weekends and the \(schedule.holidays.count) no-school days on file. Correct it any time.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            if isCurrent(slot) { Text("now").font(.caption).foregroundStyle(.green) }
-                            else if schedule.next(after: now) == slot { Text("next").font(.caption).foregroundStyle(.blue) }
+                            Picker("Today is", selection: Binding(
+                                get: { schedule.cycleLabel(for: now) ?? schedule.cycleLabels.first ?? "" },
+                                set: { state.actions.setCycleDay($0) })) {
+                                ForEach(schedule.cycleLabels, id: \.self) { Text("Day \($0)").tag($0) }
+                            }.frame(width: 170)
                         }
-                        .listRowBackground(isCurrent(slot) ? Color.accentColor.opacity(0.12) : nil)
                     }
-                }
 
-                GroupBox("Alerts") {
-                    HStack {
-                        Toggle("Notify before each class", isOn: $settings.classAlerts)
-                        Stepper("\(settings.alertMinutes) min before", value: $settings.alertMinutes, in: 1...30)
-                        Spacer()
-                        Toggle("Recording a class uses the scheduled class as its subject", isOn: $settings.subjectFromSchedule)
+                    GroupBox("3. Your classes") {
+                        let slots = schedule.slots(for: now)
+                        if slots.isEmpty {
+                            Text("No classes today.").foregroundStyle(.secondary)
+                        } else {
+                            VStack(spacing: 2) {
+                                ForEach(slots, id: \.start) { slot in
+                                    HStack {
+                                        Text(time(slot.start) + " – " + time(slot.end)).monospacedDigit().frame(width: 120, alignment: .leading)
+                                        Text(slot.period.displayName).frame(width: 110, alignment: .leading).foregroundStyle(.secondary)
+                                        Text(slot.className == "Free" ? "Free" : schedule.short(slot.className)).bold(isCurrent(slot))
+                                        Spacer()
+                                        if isCurrent(slot) { Text("now").font(.caption).foregroundStyle(.green) }
+                                        else if schedule.next(after: now) == slot { Text("next").font(.caption).foregroundStyle(.blue) }
+                                    }
+                                    .padding(.vertical, 3).padding(.horizontal, 6)
+                                    .background(isCurrent(slot) ? Color.accentColor.opacity(0.12) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                }
+                            }
+                        }
+                        HStack {
+                            Button(editing ? "Done editing" : "Edit which class is in each period…") { editing.toggle() }
+                            Button("Import my timetable PDF…") { pickFiles() }
+                            Spacer()
+                        }
+                        if editing { ClassGrid(schedule: schedule, courses: Settings.availableSubjects()) { state.actions.saveSchedule($0) } }
                     }
+
+                    GroupBox("Alerts") {
+                        HStack {
+                            Toggle("Notify before each class", isOn: $settings.classAlerts)
+                            Stepper("\(settings.alertMinutes) min before", value: $settings.alertMinutes, in: 1...30)
+                            Spacer()
+                            Toggle("Recording a class uses the scheduled class", isOn: $settings.subjectFromSchedule)
+                        }
+                    }
+                } else {
+                    Text("Start with your school name above, or import a timetable PDF.").foregroundStyle(.secondary)
+                    Button("Import my timetable PDF…") { pickFiles() }
                 }
-                if let notes = schedule.notes, !notes.isEmpty {
-                    Text("Notes from import: " + notes).font(.caption).foregroundStyle(.secondary)
-                }
-            } else {
-                Spacer()
-                Text("No schedule yet. Add your school's schedule PDF and DictateBar will show what class is next, alert you before it, and use it as context.")
-                    .foregroundStyle(.secondary).frame(maxWidth: .infinity)
-                Spacer()
             }
+            .padding(16)
         }
-        .padding(16)
         .onReceive(tick) { now = $0 }
         .onChange(of: settings) { _, new in new.save(); state.actions.applySettings(new) }
     }
@@ -242,8 +261,57 @@ private struct ScheduleView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.pdf, .plainText]
-        panel.message = "Choose your bell schedule and/or cycle-day calendar"
+        panel.message = "Choose your timetable, bell schedule or cycle-day calendar"
         if panel.runModal() == .OK { state.actions.importSchedule(panel.urls) }
+    }
+}
+
+/// Period × day table; each cell picks a Canvas course, Free, Lunch, Advisory, or "—" (not on this day).
+private struct ClassGrid: View {
+    @State var schedule: Schedule
+    let courses: [String]
+    let onSave: (Schedule) -> Void
+
+    private var options: [String] { ["—", "Free", "Lunch", "Advisory"] + courses }
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            Grid(alignment: .leading, horizontalSpacing: 6, verticalSpacing: 4) {
+                GridRow {
+                    Text("Period").font(.caption).bold().frame(width: 150, alignment: .leading)
+                    ForEach(schedule.cycleLabels, id: \.self) { Text("Day \($0)").font(.caption).bold().frame(width: 150) }
+                }
+                ForEach(schedule.periods, id: \.name) { period in
+                    GridRow {
+                        VStack(alignment: .leading) {
+                            Text(period.displayName).font(.caption)
+                            Text("\(period.start)–\(period.end)").font(.caption2).foregroundStyle(.secondary)
+                        }.frame(width: 150, alignment: .leading)
+                        ForEach(schedule.cycleLabels, id: \.self) { day in
+                            Picker("", selection: binding(period: period.name, day: day)) {
+                                ForEach(options, id: \.self) { Text(label($0)).tag($0) }
+                            }.labelsHidden().frame(width: 150)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    private func label(_ option: String) -> String {
+        courses.contains(option) ? schedule.short(option) : option
+    }
+
+    private func binding(period: String, day: String) -> Binding<String> {
+        Binding(
+            get: { schedule.classes[day]?[period] ?? "—" },
+            set: { value in
+                var dayMap = schedule.classes[day] ?? [:]
+                if value == "—" { dayMap.removeValue(forKey: period) } else { dayMap[period] = value }
+                schedule.classes[day] = dayMap
+                onSave(schedule)
+            })
     }
 }
 

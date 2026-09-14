@@ -6,6 +6,17 @@ struct Schedule: Codable, Equatable {
         var name: String
         var start: String   // "07:45"
         var end: String
+        /// Cycle labels this period occurs on; empty = every day.
+        var days: [String]?
+
+        var displayName: String {
+            name.replacingOccurrences(of: #"\s*\(.*\)"#, with: "", options: .regularExpression)
+        }
+
+        func occurs(on label: String) -> Bool {
+            guard let days, !days.isEmpty else { return true }
+            return days.contains(label)
+        }
     }
     struct Anchor: Codable, Equatable {
         var date: String    // "YYYY-MM-DD"
@@ -19,6 +30,8 @@ struct Schedule: Codable, Equatable {
     var classes: [String: [String: String]]   // cycle label -> period name -> class
     var holidays: [String]
     var notes: String?
+    var school: String?
+    var sources: [String]?
 
     static let url = Paths.library.appendingPathComponent("schedule.json")
 
@@ -78,15 +91,20 @@ struct Schedule: Codable, Equatable {
         var end: Date
     }
 
+    /// The periods that actually happen on this date, in time order. A period counts if it
+    /// occurs on the day's cycle label, or if the class table has an entry for it that day.
     func slots(for date: Date = Date()) -> [Slot] {
         guard let label = cycleLabel(for: date) else { return [] }
         let map = classes[label] ?? [:]
         let cal = Calendar.current
         let day = cal.startOfDay(for: date)
-        return periods.compactMap { p in
+        return periods.compactMap { p -> Slot? in
+            let listed = map[p.name]
+            guard listed != nil || (p.occurs(on: label) && (p.days?.isEmpty == false || map.isEmpty)) else { return nil }
             guard let s = Schedule.time(p.start, on: day), let e = Schedule.time(p.end, on: day) else { return nil }
-            return Slot(period: p, className: map[p.name] ?? "Free", start: s, end: e)
+            return Slot(period: p, className: listed ?? "Free", start: s, end: e)
         }
+        .sorted { $0.start < $1.start }
     }
 
     func current(at now: Date = Date()) -> Slot? {

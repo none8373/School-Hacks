@@ -150,6 +150,61 @@ final class Pipeline {
         }
     }
 
+    /// School name → web search → calendar + bell schedule merged into the saved schedule.
+    func lookupSchool(_ name: String, settings: Settings, completion: @escaping (Result<Schedule, Error>) -> Void) {
+        queue.async {
+            let started = Date()
+            do {
+                let instructions = try self.loadInstructions(promptFile: Paths.schoolPrompt, settings: settings)
+                let raw = try self.callAI(instructions: instructions, input: "SCHOOL: \(name)", settings: settings, webSearch: true)
+                guard let open = raw.firstIndex(of: "{"), let close = raw.lastIndex(of: "}") else { throw PipelineError.emptyResult }
+                let json = Data(raw[open...close].utf8)
+                struct Found: Decodable {
+                    var error: String?
+                    var school: String?
+                    var firstDay: String?
+                    var holidays: [String]?
+                    var cycleLength: Int?
+                    var cycleLabels: [String]?
+                    var periods: [Schedule.Period]?
+                    var sources: [String]?
+                    var notes: String?
+                }
+                let found = try JSONDecoder().decode(Found.self, from: json)
+                if let error = found.error { throw PipelineError.toolFailed("lookup", error) }
+
+                var schedule = Schedule.load() ?? Schedule(cycleLength: 5, cycleLabels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+                                                           anchor: .init(date: found.firstDay ?? "", day: "1"),
+                                                           periods: [], classes: [:], holidays: [], notes: nil)
+                schedule.school = found.school ?? name
+                schedule.sources = found.sources
+                if let h = found.holidays, !h.isEmpty { schedule.holidays = h }
+                if let n = found.cycleLength, n > 0, let labels = found.cycleLabels, labels.count == n {
+                    if schedule.cycleLength != n || schedule.cycleLabels != labels {
+                        schedule.cycleLength = n
+                        schedule.cycleLabels = labels
+                        schedule.anchor = .init(date: found.firstDay ?? schedule.anchor.date, day: labels[0])
+                    }
+                }
+                if let periods = found.periods, !periods.isEmpty {
+                    // Keep class assignments whose period names still exist.
+                    let names = Set(periods.map(\.name))
+                    schedule.periods = periods
+                    schedule.classes = schedule.classes.mapValues { $0.filter { names.contains($0.key) } }
+                }
+                schedule.notes = found.notes
+                schedule.save()
+                History.record(mode: "school", provider: settings.aiProvider.rawValue, input: name,
+                               output: String(decoding: json, as: UTF8.self), error: nil, seconds: Date().timeIntervalSince(started))
+                DispatchQueue.main.async { completion(.success(schedule)) }
+            } catch {
+                History.record(mode: "school", provider: settings.aiProvider.rawValue, input: name, output: nil,
+                               error: error.localizedDescription, seconds: Date().timeIntervalSince(started))
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }
+    }
+
     /// Splits the class output into the notes text and the JSON task list.
     static func parseClassOutput(_ raw: String, subject: String) -> (String, [Suggestion]) {
         let marker = "===SUGGESTIONS==="
@@ -246,11 +301,11 @@ final class Pipeline {
     }
 
     /// Runs the chosen provider and records token usage.
-    private func callAI(instructions: String, input: String, settings: Settings) throws -> String {
+    private func callAI(instructions: String, input: String, settings: Settings, webSearch: Bool = false) throws -> String {
         let (text, tokens): (String, Int)
         switch settings.aiProvider {
-        case .codex: (text, tokens) = try runCodex(instructions: instructions, input: input, settings: settings)
-        case .claude: (text, tokens) = try runClaude(instructions: instructions, input: input, settings: settings)
+        case .codex: (text, tokens) = try runCodex(instructions: instructions, input: input, settings: settings, webSearch: webSearch)
+        case .claude: (text, tokens) = try runClaude(instructions: instructions, input: input, settings: settings, webSearch: webSearch)
         }
         Usage.record(provider: settings.aiProvider.rawValue, tokens: tokens)
         return text
@@ -295,13 +350,13 @@ final class Pipeline {
     // MARK: AI providers
 
     /// Codex CLI (OpenAI) — signed in with the ChatGPT account via the Codex app.
-    private func runCodex(instructions: String, input: String, settings: Settings) throws -> (String, Int) {
+    private func runCodex(instructions: String, input: String, settings: Settings, webSearch: Bool = false) throws -> (String, Int) {
         let codex = settings.resolvedCodexPath
         guard FileManager.default.isExecutableFile(atPath: codex) else { throw PipelineError.missingTool(codex) }
         let outFile = FileManager.default.temporaryDirectory.appendingPathComponent("dictatebar-codex-\(UUID().uuidString).txt")
         defer { try? FileManager.default.removeItem(at: outFile) }
 
-        var args = ["exec", "--sandbox", "read-only", "--cd", Paths.library.path, "--skip-git-repo-check",
+        var args = (webSearch ? ["--search"] : []) + ["exec", "--sandbox", "read-only", "--cd", Paths.library.path, "--skip-git-repo-check",
                     "--ephemeral", "--color", "never", "--output-last-message", outFile.path]
         if !settings.codexModel.isEmpty { args += ["--model", settings.codexModel] }
         args.append(instructions)
@@ -326,7 +381,7 @@ final class Pipeline {
     }
 
     /// Claude Code CLI — signed in with the Claude subscription (`claude auth login`).
-    private func runClaude(instructions: String, input: String, settings: Settings) throws -> (String, Int) {
+    private func runClaude(instructions: String, input: String, settings: Settings, webSearch: Bool = false) throws -> (String, Int) {
         let claude = settings.resolvedClaudePath
         guard FileManager.default.isExecutableFile(atPath: claude) else { throw PipelineError.missingTool(claude) }
 
@@ -334,7 +389,7 @@ final class Pipeline {
             "-p",
             "--model", settings.claudeModel,
             "--output-format", "json",
-            "--allowedTools", "Read", "Grep", "Glob",
+            "--allowedTools", "Read", "Grep", "Glob"] + (webSearch ? ["WebSearch", "WebFetch"] : []) + [
             "--append-system-prompt", instructions,
         ], cwd: Paths.library, stdin: input)
         guard result.status == 0 else {

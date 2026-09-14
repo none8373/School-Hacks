@@ -101,12 +101,14 @@ final class TextGuide {
         var upcoming: String
     }
 
-    /// The slice of text to show, keeping the marker near the left so you see a little of what you typed.
+    /// The slice of text to show: a few typed characters, then the marker, then what's next.
+    /// Starts on a word boundary so the strip never opens mid-word.
     func window(chars width: Int) -> Window {
         guard !chars.isEmpty else { return Window(typed: "", current: "", upcoming: "") }
-        let lead = width / 4
+        let lead = min(12, max(4, width / 5))
         var start = max(0, cursor - lead)
         start = min(start, max(0, chars.count - width))
+        while start > 0, start < cursor, chars[start - 1] != " " { start -= 1 }
         let end = min(chars.count, start + width)
         let typed = String(chars[start..<min(cursor, end)])
         let current = cursor < end ? String(chars[cursor]) : ""
