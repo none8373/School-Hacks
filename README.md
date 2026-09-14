@@ -28,7 +28,7 @@ Everything the AI produces is logged to `~/Documents/DictateBar/output/history.l
 Requirements: macOS 14+, [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/) (`xcode-select --install`), [Homebrew](https://brew.sh).
 
 ```bash
-git clone https://github.com/dogeking69/DictateBar.git
+git clone https://github.com/none8373/DictateBar.git
 cd DictateBar
 scripts/build_app.sh
 ```
