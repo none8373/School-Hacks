@@ -151,8 +151,10 @@ final class StatusItemController {
                 // macOS reveals the hidden bar only when the cursor hits the top edge, and keeps
                 // it while the cursor stays within the bar — mirror that with two thresholds.
                 let top = screen?.frame.maxY ?? 0
-                let atTop = self.menuBarVisible ? mouse.y >= top - 40 : mouse.y >= top - 1
-                let visible = !fullScreen || atTop
+                let atTop = self.bandMode ? mouse.y >= top - 1 : mouse.y >= top - 40
+                // In a full-screen app the revealed menu bar is drawn above us, so the strip only
+                // lives on the black notch band and disappears while the bar is slid in.
+                let visible = !fullScreen
                 let band = fullScreen && !atTop && (screen.map { self.measureBand(on: $0) } ?? false)
                 let dark: NSAppearance? = fullScreen ? NSAppearance(named: .darkAqua) : nil
                 self.overlay.appearance = dark

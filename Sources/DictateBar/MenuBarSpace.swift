@@ -45,21 +45,25 @@ enum MenuBarSpace {
         return pos.x + sz.width
     }
 
-    /// True when a full-screen window is on screen: some normal window covers the whole
-    /// display, menu bar area included. (Accessibility's AXFullScreen is unreliable in Chrome.)
+    /// True when the front app is in full-screen mode: its normal windows together cover the
+    /// display from the top (or just under the notch band) to the bottom edge, full width.
+    /// (Chrome's full-screen is several stacked windows, so we look at their combined extent.)
     static func frontWindowIsFullScreen() -> Bool {
-        guard let screen = NSScreen.screens.first else { return false }
+        guard let screen = NSScreen.screens.first, let front = NSWorkspace.shared.frontmostApplication else { return false }
         let target = screen.frame
+        let menuBar = target.maxY - screen.visibleFrame.maxY
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else { return false }
+        var minY = CGFloat.greatestFiniteMagnitude, maxY: CGFloat = 0, fullWidth = false
         for info in list {
-            guard (info[kCGWindowLayer as String] as? Int) == 0,
+            guard (info[kCGWindowOwnerPID as String] as? Int32) == front.processIdentifier,
+                  (info[kCGWindowLayer as String] as? Int) == 0,
                   let b = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let x = b["X"], let y = b["Y"], let w = b["Width"], let h = b["Height"] else { continue }
-            // Full-screen windows start at the top (or just under the notch band) and reach the bottom edge.
-            let menuBar = target.maxY - screen.visibleFrame.maxY
-            if abs(x - target.minX) < 1, y <= menuBar + 1, abs(w - target.width) < 1, y + h >= target.height - 1 { return true }
+                  let x = b["X"], let y = b["Y"], let w = b["Width"], let h = b["Height"], w > 200 else { continue }
+            if abs(x - target.minX) < 1, abs(w - target.width) < 1 { fullWidth = true }
+            minY = min(minY, y)
+            maxY = max(maxY, y + h)
         }
-        return false
+        return fullWidth && minY <= menuBar + 1 && maxY >= target.height - 1
     }
 
     // MARK: AX helpers
