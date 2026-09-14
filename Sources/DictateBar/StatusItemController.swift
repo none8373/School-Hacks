@@ -142,20 +142,18 @@ final class StatusItemController {
     /// In a full-screen app the menu bar only appears while the mouse is at the top edge,
     /// and it is always drawn dark there, so the strip switches to white text.
     private func pollMenuBarVisibility() {
-        let mouse = NSEvent.mouseLocation
+        // Our own status item is hidden together with the menu bar and visible when it slides
+        // in — macOS reports that through the item window's occlusion state.
+        let barShown = item.button?.window?.occlusionState.contains(.visible) ?? true
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let fullScreen = MenuBarSpace.frontWindowIsFullScreen()
             DispatchQueue.main.async {
                 guard let self else { return }
                 let screen = self.item.button?.window?.screen ?? NSScreen.screens.first
-                // macOS reveals the hidden bar only when the cursor hits the top edge, and keeps
-                // it while the cursor stays within the bar — mirror that with two thresholds.
-                let top = screen?.frame.maxY ?? 0
-                let atTop = self.bandMode ? mouse.y >= top - 1 : mouse.y >= top - 40
                 // In a full-screen app the revealed menu bar is drawn above us, so the strip only
                 // lives on the black notch band and disappears while the bar is slid in.
                 let visible = !fullScreen
-                let band = fullScreen && !atTop && (screen.map { self.measureBand(on: $0) } ?? false)
+                let band = fullScreen && !barShown && (screen.map { self.measureBand(on: $0) } ?? false)
                 let dark: NSAppearance? = fullScreen ? NSAppearance(named: .darkAqua) : nil
                 self.overlay.appearance = dark
                 self.overlayRight.appearance = dark
