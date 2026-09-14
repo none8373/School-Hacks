@@ -418,6 +418,8 @@ private struct AppearanceView: View {
                 ColorPicker("Next-letter highlight", selection: HexColorBinding.make($settings.appearance.highlightColor, fallback: .controlAccentColor))
                 ColorPicker("Next-letter text", selection: HexColorBinding.make($settings.appearance.highlightTextColor, fallback: .white))
                 ColorPicker("Suggestion", selection: HexColorBinding.make($settings.appearance.suggestionColor, fallback: .secondaryLabelColor))
+                Text("System colors: black text in light mode, white in dark mode, always white on a full-screen app's black band.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Button("Use system colors") {
                     settings.appearance.textColor = ""; settings.appearance.typedColor = ""
                     settings.appearance.highlightColor = ""; settings.appearance.suggestionColor = ""

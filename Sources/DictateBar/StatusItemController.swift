@@ -20,6 +20,8 @@ final class StatusItemController {
     let guide: TextGuide
     private let item: NSStatusItem
     private let overlay = OverlayWindow()
+    /// Second strip for the right side of the notch, used in full-screen "band" mode.
+    private let overlayRight = OverlayWindow()
     private let menu = NSMenu()
     private let playPauseItem = NSMenuItem()
     private let hideItem = NSMenuItem()
@@ -55,6 +57,7 @@ final class StatusItemController {
     var appearance = Appearance() {
         didSet {
             overlay.apply(appearance)
+            overlayRight.apply(appearance)
             regrow()
             render()
         }
@@ -83,14 +86,16 @@ final class StatusItemController {
                                                object: nil, queue: .main) { [weak self] _ in self?.regrow() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                                                           object: nil, queue: .main) { [weak self] _ in self?.regrow() }
-        visibilityTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollMenuBarVisibility() }
+        visibilityTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.pollMenuBarVisibility() }
     }
 
     // MARK: Measuring free space
 
     private var gap: ClosedRange<CGFloat> = 0...0
-    /// Hidden while a full-screen app has the menu bar tucked away.
+    /// Hidden while a full-screen app has the menu bar tucked away…
     private var menuBarVisible = true
+    /// …unless the Mac has a notch: then the empty black band at the top is ours to fill.
+    private var bandMode = false
     private var visibilityTimer: Timer?
     private var overlayChars = 0
     private var statusChars = 40
@@ -102,8 +107,25 @@ final class StatusItemController {
 
     /// The line flows left-of-notch first, then continues in the status item on the right.
     private var effectiveLineChars: Int {
+        if bandMode { return bandLeftChars + bandRightChars }
         if lineChars > 0 { return lineChars }
         return usingOverlay ? overlayChars + statusChars : statusChars
+    }
+
+    // MARK: Full-screen band (notched Macs)
+
+    private var bandLeft: ClosedRange<CGFloat> = 0...0
+    private var bandRight: ClosedRange<CGFloat> = 0...0
+    private var bandLeftChars = 0
+    private var bandRightChars = 0
+
+    private func measureBand(on screen: NSScreen) -> Bool {
+        guard let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea else { return false }
+        bandLeft = (left.minX + 10)...(left.maxX - 6)
+        bandRight = (right.minX + 6)...(right.maxX - 10)
+        bandLeftChars = Int((bandLeft.upperBound - bandLeft.lowerBound - 16) / charWidth)
+        bandRightChars = Int((bandRight.upperBound - bandRight.lowerBound - 16) / charWidth)
+        return bandLeftChars >= minOverlayChars
     }
 
     /// Re-measure soon (new text, screen change, another app came to the front).
@@ -126,9 +148,13 @@ final class StatusItemController {
                 let screen = self.item.button?.window?.screen ?? NSScreen.screens.first
                 let atTop = screen.map { mouse.y >= $0.frame.maxY - 30 } ?? true
                 let visible = !fullScreen || atTop
-                self.overlay.appearance = fullScreen ? NSAppearance(named: .darkAqua) : nil
-                guard visible != self.menuBarVisible else { return }
+                let band = fullScreen && !atTop && (screen.map { self.measureBand(on: $0) } ?? false)
+                let dark: NSAppearance? = fullScreen ? NSAppearance(named: .darkAqua) : nil
+                self.overlay.appearance = dark
+                self.overlayRight.appearance = dark
+                guard visible != self.menuBarVisible || band != self.bandMode else { return }
                 self.menuBarVisible = visible
+                self.bandMode = band
                 self.render()
                 if visible { self.regrow() }
             }
@@ -316,33 +342,28 @@ final class StatusItemController {
             }
         }
 
+        let showSuggestion = suggestion != nil && suggestionBarVisible && status == .idle
+
+        if bandMode, !isHidden, let screen = button.window?.screen ?? NSScreen.screens.first {
+            // Full-screen app, menu bar hidden: fill the black band on both sides of the notch.
+            let suggestionText = showSuggestion ? compactSuggestion(suggestion!, font: font, room: min(30, bandLeftChars / 3)) : nil
+            let (left, right) = split(prefix: prefix, body: body, leftChars: bandLeftChars - (suggestionText.map { $0.length + 3 } ?? 0),
+                                      rightChars: bandRightChars)
+            overlay.show(text: left, trailing: suggestionText, x: bandLeft, on: screen)
+            overlayRight.show(text: right, trailing: nil, x: bandRight, on: screen)
+            button.attributedTitle = NSAttributedString()
+            return
+        }
+        overlayRight.orderOut(nil)
+
         if usingOverlay, !isHidden, menuBarVisible, let screen = button.window?.screen ?? NSScreen.screens.first {
             // Left strip gets the prefix, the first part of the text and, at its right end, the
-            // suggestion. Cut at a word boundary so no word is torn in half by the notch.
-            let showSuggestion = suggestion != nil && suggestionBarVisible && status == .idle
+            // suggestion; the status item shows whole words that fit right of the notch.
             let suggestionText = showSuggestion ? compactSuggestion(suggestion!, font: font, room: min(30, overlayChars / 3)) : nil
-            let reserved = suggestionText.map { $0.length + 3 } ?? 0
-            let limit = max(0, overlayChars - prefix.length - reserved)
-            var cut = min(limit, body.length)
-            if cut < body.length {
-                let text = body.string as NSString
-                let searchRange = NSRange(location: 0, length: cut)
-                let lastSpace = text.range(of: " ", options: .backwards, range: searchRange)
-                if lastSpace.location != NSNotFound, lastSpace.location > cut / 2 { cut = lastSpace.location + 1 }
-            }
-            let left = NSMutableAttributedString(attributedString: prefix)
-            left.append(body.attributedSubstring(from: NSRange(location: 0, length: cut)))
+            let (left, right) = split(prefix: prefix, body: body, leftChars: overlayChars - (suggestionText.map { $0.length + 3 } ?? 0),
+                                      rightChars: statusChars)
             overlay.show(text: left, trailing: suggestionText, x: gap, on: screen)
-            // Right of the notch: only whole words, or nothing.
-            var rightLength = min(body.length - cut, statusChars)
-            if cut + rightLength < body.length {
-                let tail = body.string as NSString
-                let lastSpace = tail.range(of: " ", options: .backwards, range: NSRange(location: cut, length: rightLength))
-                rightLength = lastSpace.location == NSNotFound ? 0 : lastSpace.location - cut
-            }
-            button.attributedTitle = rightLength >= 3
-                ? body.attributedSubstring(from: NSRange(location: cut, length: rightLength))
-                : NSAttributedString()
+            button.attributedTitle = right
         } else {
             overlay.orderOut(nil)
             prefix.append(body)
@@ -352,6 +373,29 @@ final class StatusItemController {
 }
 
 extension StatusItemController {
+    /// Splits the line into what fits left of the notch and what continues right of it,
+    /// cutting only at word boundaries so no word is torn in half.
+    fileprivate func split(prefix: NSAttributedString, body: NSAttributedString, leftChars: Int, rightChars: Int)
+        -> (NSAttributedString, NSAttributedString) {
+        let limit = max(0, leftChars - prefix.length)
+        var cut = min(limit, body.length)
+        let text = body.string as NSString
+        if cut < body.length {
+            let lastSpace = text.range(of: " ", options: .backwards, range: NSRange(location: 0, length: cut))
+            if lastSpace.location != NSNotFound, lastSpace.location > cut / 2 { cut = lastSpace.location + 1 }
+        }
+        let left = NSMutableAttributedString(attributedString: prefix)
+        left.append(body.attributedSubstring(from: NSRange(location: 0, length: cut)))
+
+        var rightLength = min(body.length - cut, max(0, rightChars))
+        if cut + rightLength < body.length, rightLength > 0 {
+            let lastSpace = text.range(of: " ", options: .backwards, range: NSRange(location: cut, length: rightLength))
+            rightLength = lastSpace.location == NSNotFound ? 0 : lastSpace.location - cut
+        }
+        let right = rightLength >= 3 ? body.attributedSubstring(from: NSRange(location: cut, length: rightLength)) : NSAttributedString()
+        return (left, right)
+    }
+
     /// "📌 ENG: HW 9/10 · Fri" squeezed into the space right of the notch.
     fileprivate func compactSuggestion(_ s: Suggestion, font: NSFont, room: Int) -> NSAttributedString {
         let room = max(8, room - 2)

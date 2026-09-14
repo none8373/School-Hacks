@@ -67,7 +67,7 @@ Prompts the AI follows are in [`prompts/`](prompts) — edit them to change the 
 
 ## How it works
 
-Swift menu bar app (no Xcode project — `swift build`) · [whisper.cpp](https://github.com/ggerganov/whisper.cpp) for transcription · [Codex CLI](https://github.com/openai/codex) or [Claude Code](https://claude.ai/code) run non-interactively with read-only access to your library folder · a small Python script for the Canvas API · EventKit for the calendar. The menu bar line is a transparent panel floating over the bar; it measures the free space with Accessibility and never pushes other icons out.
+Swift menu bar app (no Xcode project — `swift build`) · [whisper.cpp](https://github.com/ggerganov/whisper.cpp) for transcription · [Codex CLI](https://github.com/openai/codex) or [Claude Code](https://claude.ai/code) run non-interactively with read-only access to your library folder · a small Python script for the Canvas API · EventKit for the calendar. The menu bar line is a transparent panel floating over the bar; it measures the free space with Accessibility and never pushes other icons out. In a full-screen app on a notched Mac it fills the empty black band on both sides of the notch, and steps aside when the menu bar slides in.
 
 See [SPEC.md](SPEC.md) for the design.
 
