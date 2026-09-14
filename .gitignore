@@ -1,0 +1,14 @@
+# secrets and personal data — never commit
+.env
+config.json
+library/
+output/
+recordings/
+debug.log
+
+# build products
+.build/
+.build.nosync/
+build/
+.venv/
+.DS_Store
