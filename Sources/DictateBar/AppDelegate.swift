@@ -14,7 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let suggestions = SuggestionStore()
     private let calendar = CalendarSync()
     private let briefScheduler = BriefScheduler()
+    private let alerts = ClassAlerts()
     private var classStartedAt: Date?
+    private var classSubjectAtStart: String?
     private var lastClassNotes: String?
     private let state = AppState()
     private lazy var mainWindow = MainWindowController(state: state)
@@ -80,7 +82,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LoginItem.apply(settings.launchAtLogin)
         briefScheduler.onDue = { [weak self] in self?.generateBrief() }
         briefScheduler.configure(enabled: settings.briefEnabled, hour: settings.briefHour, minute: settings.briefMinute)
+        alerts.schedule = Schedule.load()
+        alerts.enabled = settings.classAlerts
+        alerts.minutesBefore = settings.alertMinutes
+        alerts.start()
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.publishState() }
         showSetupIfNeeded()
+    }
+
+    // MARK: Schedule
+
+    private func importSchedule(_ files: [URL]) {
+        guard !isBusy, !files.isEmpty else { return }
+        statusItem.status = .thinking
+        state.scheduleStatus = "Reading \(files.count) file(s) and building your schedule…"
+        settings = Settings.load()
+        pipeline.importSchedule(files: files, settings: settings) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let schedule):
+                self.alerts.schedule = schedule
+                self.statusItem.status = .message("Schedule imported: \(schedule.periods.count) periods, \(schedule.cycleLength)-day cycle")
+                self.state.scheduleStatus = schedule.notes ?? ""
+            case .failure(let error):
+                self.statusItem.status = .error("Schedule: \(error.localizedDescription)")
+                self.state.scheduleStatus = error.localizedDescription
+            }
+            self.publishState()
+        }
+    }
+
+    private func setCycleDay(_ label: String) {
+        guard var schedule = Schedule.load() else { return }
+        schedule.setToday(label)
+        schedule.save()
+        alerts.schedule = schedule
+        publishState()
+    }
+
+    /// The class the schedule says is happening right now, as a subject folder name.
+    private var currentScheduledSubject: String? {
+        guard settings.subjectFromSchedule, let current = Schedule.load()?.current(), current.className != "Free" else { return nil }
+        return Settings.availableSubjects().first { $0 == current.className } ?? current.className
     }
 
     /// The daily brief: runs on schedule or from the Morning brief page.
@@ -122,6 +165,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.actions.openSetup = { [weak self] in self?.setupWindow.show() }
         state.actions.applySettings = { [weak self] s in self?.apply(s) }
         state.actions.generateBrief = { [weak self] in self?.generateBrief() }
+        state.actions.importSchedule = { [weak self] files in self?.importSchedule(files) }
+        state.actions.setCycleDay = { [weak self] label in self?.setCycleDay(label) }
     }
 
     private func publishState() {
@@ -246,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.status = .thinking
         publishState()
         settings = Settings.load()
+        if let scheduled = classSubjectAtStart { settings.subject = scheduled }
         pipeline.runClass(wav: wav, startedAt: startedAt, settings: settings) { [weak self] result in
             guard let self else { return }
             switch result {
@@ -336,6 +382,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 try self.recorder.start(to: url)
                 self.classStartedAt = isClass ? Date() : nil
+                self.classSubjectAtStart = isClass ? self.currentScheduledSubject : nil
                 self.statusItem.isClassRecording = isClass
                 self.statusItem.status = .recording
                 self.publishState()
@@ -366,6 +413,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sync.schedule(everyHours: updated.syncHours)
         LoginItem.apply(updated.launchAtLogin)
         briefScheduler.configure(enabled: updated.briefEnabled, hour: updated.briefHour, minute: updated.briefMinute)
+        alerts.enabled = updated.classAlerts
+        alerts.minutesBefore = updated.alertMinutes
         statusItem.regrow()
     }
 

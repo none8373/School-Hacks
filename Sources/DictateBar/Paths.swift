@@ -32,6 +32,9 @@ enum Paths {
     static let gradePrompt = resources.appendingPathComponent("prompts/grade.md")
     static let classPrompt = resources.appendingPathComponent("prompts/class.md")
     static let briefPrompt = resources.appendingPathComponent("prompts/brief.md")
+    static let schedulePrompt = resources.appendingPathComponent("prompts/schedule.md")
+    static let pdfTextScript = resources.appendingPathComponent("sync/pdf_text.py")
+    static let scheduleDocs = library.appendingPathComponent("schedule")
     static let briefs = library.appendingPathComponent("briefs")
     static let envFile = root.appendingPathComponent(".env")
     static let venv = root.appendingPathComponent(".venv")
@@ -40,7 +43,7 @@ enum Paths {
     static let venvPython = venv.appendingPathComponent("bin/python")
 
     static func ensureFolders() {
-        for dir in [output, history, recordings, library, models, classes, briefs] {
+        for dir in [output, history, recordings, library, models, classes, briefs, scheduleDocs] {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
     }

@@ -113,6 +113,43 @@ final class Pipeline {
         }
     }
 
+    /// Schedule PDFs → text → AI → Schedule JSON.
+    func importSchedule(files: [URL], settings: Settings, completion: @escaping (Result<Schedule, Error>) -> Void) {
+        queue.async {
+            let started = Date()
+            do {
+                try CanvasSync.ensureVenv()
+                // Keep copies so the documents stay available for later re-imports.
+                for f in files {
+                    let dest = Paths.scheduleDocs.appendingPathComponent(f.lastPathComponent)
+                    if dest != f { try? FileManager.default.removeItem(at: dest); try? FileManager.default.copyItem(at: f, to: dest) }
+                }
+                let text = try Shell.run(Paths.venvPython.path, [Paths.pdfTextScript.path] + files.map(\.path))
+                guard text.status == 0, !text.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw PipelineError.toolFailed("pdf", "could not read the file(s)")
+                }
+                let courses = Settings.availableSubjects().joined(separator: "\n")
+                let instructions = try self.loadInstructions(promptFile: Paths.schedulePrompt, settings: settings)
+                let input = "CANVAS COURSES:\n\(courses)\n\nDOCUMENTS:\n\n" + text.stdout
+                let raw = try self.callAI(instructions: instructions, input: input, settings: settings)
+                guard let open = raw.firstIndex(of: "{"), let close = raw.lastIndex(of: "}") else { throw PipelineError.emptyResult }
+                let json = Data(raw[open...close].utf8)
+                if let err = try? JSONDecoder().decode([String: String].self, from: json), let message = err["error"] {
+                    throw PipelineError.toolFailed("schedule", message)
+                }
+                let schedule = try JSONDecoder().decode(Schedule.self, from: json)
+                schedule.save()
+                History.record(mode: "schedule", provider: settings.aiProvider.rawValue, input: files.map(\.lastPathComponent).joined(separator: ", "),
+                               output: String(decoding: json, as: UTF8.self), error: nil, seconds: Date().timeIntervalSince(started))
+                DispatchQueue.main.async { completion(.success(schedule)) }
+            } catch {
+                History.record(mode: "schedule", provider: settings.aiProvider.rawValue, input: files.map(\.lastPathComponent).joined(separator: ", "),
+                               output: nil, error: error.localizedDescription, seconds: Date().timeIntervalSince(started))
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }
+    }
+
     /// Splits the class output into the notes text and the JSON task list.
     static func parseClassOutput(_ raw: String, subject: String) -> (String, [Suggestion]) {
         let marker = "===SUGGESTIONS==="
@@ -227,6 +264,10 @@ final class Pipeline {
         var context = "\n\nCONTEXT\nToday: \(f.string(from: Date()))\n"
         context += "Subject folder: " + (settings.subject.isEmpty ? "(none selected - infer from the request)" : "canvas/\(settings.subject)") + "\n"
         context += "Grade level: " + (settings.gradeLevel.isEmpty ? "(unknown - infer from the course name)" : settings.gradeLevel) + "\n"
+        if let schedule = Schedule.load() {
+            context += "Schedule: \(schedule.summary())\n"
+            if let c = schedule.current() { context += "Current class folder: canvas/\(c.className)\n" }
+        }
         context += "Library root is the current directory; INDEX.md lists everything. classes/<subject>/ holds notes and transcripts of recorded classes; canvas/<subject>/from_class.md holds what the teacher said about assignments.\n"
         return prompt + context
     }

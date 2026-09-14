@@ -14,6 +14,7 @@ let package = Package(
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("EventKit"),
                 .linkedFramework("ServiceManagement"),
+                .linkedFramework("UserNotifications"),
             ]
         )
     ]

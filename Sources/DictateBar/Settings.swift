@@ -32,6 +32,10 @@ struct Settings: Codable, Equatable {
     var briefEnabled: Bool = true
     var briefHour: Int = 7
     var briefMinute: Int = 0
+    var classAlerts: Bool = true
+    var alertMinutes: Int = 5
+    /// When recording a class, use whatever the schedule says you're in right now.
+    var subjectFromSchedule: Bool = true
     var syncHours: Double = 4
     var whisperPath: String = "/opt/homebrew/bin/whisper-cli"
     var claudePath: String = "~/.local/bin/claude"

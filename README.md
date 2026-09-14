@@ -15,6 +15,7 @@ It reads your own Canvas courses (assignments, rubrics, modules, readings, the t
 | **Grade** `⌥G` | Copies the document you're in and grades it against the assignment's Canvas rubric at your grade level: score per criterion, three fixes, what's missing. |
 | **Record class** `⌥C` | Records the whole period, transcribes it, writes organized notes, pulls out homework and test dates the teacher mentioned, and saves what was said about each Canvas assignment. `⌥P` pastes the notes anywhere. |
 | **Suggestion** | The next thing worth doing (from class + Canvas work due soon) sits at the right of the line. `⌥W` writes it, `⌥J` next, `⌥D` done. |
+| **Schedule** | Add your school's bell schedule / cycle-day PDFs; the AI builds a rotating timetable. The app shows today's periods with what's now and next, notifies you a few minutes before each class, uses the current class as context for every job, and picks it automatically when you record a class. |
 | **Morning brief** | Every morning (time of your choice) it reads the latest class notes, to-dos and Canvas due dates, finds things like "reading quiz tomorrow on pages 40–80", pulls those pages from the synced PDF text, and writes a five-minute review. Its own page in the app; past briefs kept. |
 | **Calendar** | A "DictateBar" iCloud calendar gets due dates, class sessions with notes, and to-dos. |
 | **Language classes** | Essays and prompts come out in the target language; notes give vocabulary with English meanings. |

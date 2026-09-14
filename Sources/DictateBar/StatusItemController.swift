@@ -26,6 +26,7 @@ final class StatusItemController {
     private let recordItem = NSMenuItem()
     private let syncItem = NSMenuItem()
     private let statusLine = NSMenuItem()
+    private let scheduleLine = NSMenuItem()
 
     /// Handlers the app wires up.
     var onPlayPause: (() -> Void)?
@@ -166,6 +167,8 @@ final class StatusItemController {
     private func buildMenu() {
         statusLine.isEnabled = false
         menu.addItem(statusLine)
+        scheduleLine.isEnabled = false
+        menu.addItem(scheduleLine)
         menu.addItem(.separator())
         add(NSMenuItem(), title: "Open DictateBar", key: "o", action: #selector(openWindowTapped))
         menu.addItem(.separator())
@@ -220,6 +223,8 @@ final class StatusItemController {
         recordItem.title = status == .recording && !isClassRecording ? "Stop recording" : "Record"
         classItem.title = isClassRecording ? "Stop class recording" : "Record class"
         suggestionToggleItem.title = suggestionBarVisible ? "Hide suggestion" : "Show suggestion"
+        scheduleLine.title = Schedule.load()?.summary() ?? "No schedule yet — add it in the app"
+        scheduleLine.isHidden = false
         usageLine1.title = "Usage — " + Usage.summary(provider: "codex")
         usageLine2.title = "Usage — " + Usage.summary(provider: "claude")
         syncItem.title = "Sync Canvas now  (\(CanvasSync.lastSyncDescription()))"

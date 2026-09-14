@@ -26,6 +26,8 @@ final class AppState: ObservableObject {
     @Published var history: [HistoryEntry] = []
     @Published var classNotes: [ClassNote] = []
     @Published var briefs: [ClassNote] = []      // reuse: subject = date, text = brief
+    @Published var schedule: Schedule?
+    @Published var scheduleStatus = ""
 
     struct Actions {
         var record: () -> Void = {}
@@ -44,6 +46,8 @@ final class AppState: ObservableObject {
         var openSetup: () -> Void = {}
         var applySettings: (Settings) -> Void = { _ in }
         var generateBrief: () -> Void = {}
+        var importSchedule: ([URL]) -> Void = { _ in }
+        var setCycleDay: (String) -> Void = { _ in }
     }
     var actions = Actions()
 
@@ -54,6 +58,7 @@ final class AppState: ObservableObject {
         history = AppState.parseHistory()
         classNotes = AppState.loadClassNotes()
         briefs = AppState.loadBriefs()
+        schedule = Schedule.load()
     }
 
     private static func loadBriefs() -> [ClassNote] {

@@ -1,16 +1,18 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The full app window: Home, History, Class notes, Suggestions, Appearance, Settings.
 final class MainWindowController {
     enum Page: String, CaseIterable, Identifiable {
-        case home = "Home", brief = "Morning brief", history = "History", classes = "Class notes", suggestions = "Suggestions",
+        case home = "Home", schedule = "Schedule", brief = "Morning brief", history = "History", classes = "Class notes", suggestions = "Suggestions",
              appearance = "Appearance", settings = "Settings"
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .home: return "house"
             case .brief: return "sunrise"
+            case .schedule: return "calendar.day.timeline.left"
             case .history: return "clock"
             case .classes: return "book"
             case .suggestions: return "pin"
@@ -63,6 +65,7 @@ private struct MainView: View {
             switch selection.page {
             case .home: HomeView(state: state)
             case .brief: BriefView(state: state)
+            case .schedule: ScheduleView(state: state)
             case .history: HistoryView(state: state)
             case .classes: ClassesView(state: state)
             case .suggestions: SuggestionsView(state: state)
@@ -144,6 +147,103 @@ private struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 60)
         }
+    }
+}
+
+// MARK: - Schedule
+
+private struct ScheduleView: View {
+    @ObservedObject var state: AppState
+    @State private var settings = Settings.load()
+    @State private var now = Date()
+    private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Button("Add schedule PDF…") { pickFiles() }
+                Text("Bell schedule, cycle-day calendar, your timetable — one or several files. The AI reads them and builds the schedule; re-add any time to replace it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if !state.scheduleStatus.isEmpty {
+                Text(state.scheduleStatus).font(.caption).foregroundStyle(.secondary)
+            }
+
+            if let schedule = state.schedule {
+                GroupBox {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(headline(schedule)).font(.title3.bold())
+                            Text(schedule.summary(at: now)).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Picker("Today is", selection: Binding(
+                            get: { schedule.cycleLabel(for: now) ?? schedule.cycleLabels.first ?? "" },
+                            set: { state.actions.setCycleDay($0) })) {
+                            ForEach(schedule.cycleLabels, id: \.self) { Text("Day \($0)").tag($0) }
+                        }.frame(width: 160)
+                    }
+                }
+
+                let slots = schedule.slots(for: now)
+                if slots.isEmpty {
+                    Text("No classes today.").foregroundStyle(.secondary)
+                } else {
+                    List(slots, id: \.start) { slot in
+                        HStack {
+                            Text(time(slot.start) + " – " + time(slot.end)).monospacedDigit().frame(width: 120, alignment: .leading)
+                            Text(slot.period.name).frame(width: 110, alignment: .leading).foregroundStyle(.secondary)
+                            Text(slot.className == "Free" ? "Free" : schedule.short(slot.className)).bold(isCurrent(slot))
+                            Spacer()
+                            if isCurrent(slot) { Text("now").font(.caption).foregroundStyle(.green) }
+                            else if schedule.next(after: now) == slot { Text("next").font(.caption).foregroundStyle(.blue) }
+                        }
+                        .listRowBackground(isCurrent(slot) ? Color.accentColor.opacity(0.12) : nil)
+                    }
+                }
+
+                GroupBox("Alerts") {
+                    HStack {
+                        Toggle("Notify before each class", isOn: $settings.classAlerts)
+                        Stepper("\(settings.alertMinutes) min before", value: $settings.alertMinutes, in: 1...30)
+                        Spacer()
+                        Toggle("Recording a class uses the scheduled class as its subject", isOn: $settings.subjectFromSchedule)
+                    }
+                }
+                if let notes = schedule.notes, !notes.isEmpty {
+                    Text("Notes from import: " + notes).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Spacer()
+                Text("No schedule yet. Add your school's schedule PDF and DictateBar will show what class is next, alert you before it, and use it as context.")
+                    .foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                Spacer()
+            }
+        }
+        .padding(16)
+        .onReceive(tick) { now = $0 }
+        .onChange(of: settings) { _, new in new.save(); state.actions.applySettings(new) }
+    }
+
+    private func headline(_ s: Schedule) -> String {
+        let f = DateFormatter(); f.dateFormat = "EEEE, MMM d"
+        return f.string(from: now) + (s.cycleLabel(for: now).map { " · Day \($0)" } ?? " · No school")
+    }
+
+    private func isCurrent(_ slot: Schedule.Slot) -> Bool { slot.start <= now && now < slot.end }
+
+    private func time(_ d: Date) -> String {
+        let f = DateFormatter(); f.dateFormat = "h:mm"
+        return f.string(from: d)
+    }
+
+    private func pickFiles() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.pdf, .plainText]
+        panel.message = "Choose your bell schedule and/or cycle-day calendar"
+        if panel.runModal() == .OK { state.actions.importSchedule(panel.urls) }
     }
 }
 
