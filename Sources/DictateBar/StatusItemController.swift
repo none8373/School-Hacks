@@ -39,6 +39,7 @@ final class StatusItemController {
     var onClipboard: (() -> Void)?
     var onNotes: (() -> Void)?
     var onGrade: (() -> Void)?
+    var onPage: (() -> Void)?
     var onSettings: (() -> Void)?
     var onSetup: (() -> Void)?
     var onOpenWindow: (() -> Void)?
@@ -208,6 +209,7 @@ final class StatusItemController {
         add(NSMenuItem(), title: "Use clipboard text as prompt", key: "v", action: #selector(clipboardTapped))
         add(NSMenuItem(), title: "Notes for current assignment", key: "n", action: #selector(notesTapped))
         add(NSMenuItem(), title: "Grade the front document", key: "g", action: #selector(gradeTapped))
+        add(NSMenuItem(), title: "Write / revise this page", key: "e", action: #selector(pageTapped))
         menu.addItem(.separator())
         add(classItem, title: "Record class", key: "c", action: #selector(classTapped))
         add(NSMenuItem(), title: "Paste class notes", key: "p", action: #selector(pasteNotesTapped))
@@ -275,6 +277,7 @@ final class StatusItemController {
     @objc private func clipboardTapped() { onClipboard?() }
     @objc private func notesTapped() { onNotes?() }
     @objc private func gradeTapped() { onGrade?() }
+    @objc private func pageTapped() { onPage?() }
     @objc private func settingsTapped() { onSettings?() }
     @objc private func setupTapped() { onSetup?() }
     @objc private func openWindowTapped() { onOpenWindow?() }

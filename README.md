@@ -14,10 +14,12 @@ Speech never leaves your Mac. The "AI" part uses a ChatGPT or Claude account you
 | Turn on **Caps Lock** and mash any keys | It types the correct text for you, one letter per key. |
 | Press **⌥N** | Study notes for whatever test or assignment is next in your class, built from the actual unit pages and PDFs in Canvas. |
 | Press **⌥G** while in a doc | Grades your document with the teacher's rubric from Canvas, tells you what to fix. |
+| Press **⌥E** on any page | Reads the page you're on. Canvas assignment or blank doc → writes it. Essay already there → a ten-word verdict, a revised version, then the full grade. |
 | Press **⌥C** when class starts, again when it ends | Records the whole class, writes neat notes, and pulls out the homework and test dates the teacher mentioned. **⌥P** pastes the notes anywhere. |
 | Nothing | Every morning it writes a 5-minute brief: what's due today and tomorrow, and the exact pages to review if there's a quiz. |
 | Look at the bar | `📌` next assignment · `📝` what the teacher asked for in class · `⏭` your next class and minutes left. **⌥W** writes the suggested assignment for you. |
-| Press **⌥O** or click the mic | Opens the app: history, class notes, schedule, morning briefs, colours, settings. |
+| Press **⌥O** or click the mic | Opens the app, in four sections: **Today** (actions, morning brief, schedule), **Canvas** (dashboard, assignments, courses), **Your work** (class notes, suggestions, history) and **Setup**. |
+| Open **Canvas → Dashboard** | Your grade in each class, what's **missing or overdue**, what's due this week, and what just came back graded — pulled from your own Canvas account. |
 
 ---
 
@@ -44,7 +46,8 @@ Speech never leaves your Mac. The "AI" part uses a ChatGPT or Claude account you
    - **AI** → pick Codex or Claude → *Test*. If it says not signed in: open the Codex app and log in (or run `claude auth login` in Terminal).
    - **Canvas** → paste your school's Canvas address and a token. To get a token: Canvas → your picture → **Settings** → scroll to *Approved Integrations* → **+ New Access Token** → Generate → copy. Then *Save & sync courses*.
    - **Microphone / Accessibility / Calendar** → *Allow*. Accessibility opens System Settings — flip the switch next to DictateBar.
-6. Click the mic icon in the menu bar → **Settings** → choose your class → done.
+6. In **Chrome**, turn on **View → Developer → Allow JavaScript from Apple Events**. This lets ⌥E read Canvas pages without touching your clipboard. (Google Docs works either way — Docs draws its text in a way JavaScript can't read, so those use copy instead.)
+7. Click the mic icon in the menu bar → **Settings** → choose your class → done.
 
 Press **⌥R** and say something.
 
@@ -66,6 +69,7 @@ Now the bar shows your next class, you get a ping 5 minutes before each one, and
 | ⌥V | use copied text as the request |
 | ⌥N | notes for the next test/assignment |
 | ⌥G | grade the document I'm in |
+| ⌥E | write or revise the page I'm on |
 | ⌥C | record class / stop |
 | ⌥P | paste class notes |
 | ⌥W / ⌥J / ⌥D | write the suggestion / next / done |

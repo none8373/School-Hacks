@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.onClipboard = { [weak self] in self?.promptFromClipboard() }
         statusItem.onNotes = { [weak self] in self?.showNotes() }
         statusItem.onGrade = { [weak self] in self?.gradeFrontDocument() }
+        statusItem.onPage = { [weak self] in self?.writeFromPage() }
         statusItem.onSettings = { [weak self] in self?.mainWindow.show(page: .settings) }
         statusItem.onOpenWindow = { [weak self] in self?.mainWindow.show() }
         wireState()
@@ -177,6 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.actions.clipboardPrompt = { [weak self] in self?.promptFromClipboard() }
         state.actions.notes = { [weak self] in self?.showNotes() }
         state.actions.grade = { [weak self] in self?.gradeFrontDocument() }
+        state.actions.page = { [weak self] in self?.writeFromPage() }
         state.actions.pasteNotes = { [weak self] in self?.pasteClassNotes() }
         state.actions.writeSuggestion = { [weak self] in self?.writeSuggestion() }
         state.actions.nextSuggestion = { [weak self] in self?.suggestions.next(); self?.refreshSuggestionBar() }
@@ -247,6 +249,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .clipboard: promptFromClipboard()
         case .notes: showNotes()
         case .grade: gradeFrontDocument()
+        case .page: writeFromPage()
         case .classRecord: toggleClassRecording()
         case .pasteNotes: pasteClassNotes()
         case .writeSuggestion: writeSuggestion()
@@ -483,6 +486,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             self.start(.grade(text))
+        }
+    }
+
+    /// Reads the page in Chrome and acts on it: writes the assignment, or grades
+    /// what is written and revises it. Google Docs and non-Chrome apps fall back
+    /// to the Select All + Copy capture.
+    private func writeFromPage() {
+        guard !isBusy else { return }
+        statusItem.status = .thinking
+        publishState()
+
+        switch ChromeCapture.capture() {
+        case .page(let page):
+            start(.page(page.promptBlock))
+        case .useFrontDocument(let url, let title):
+            captureFrontDocumentAsPage(url: url, title: title)
+        case .failure(let error):
+            // Chrome not being there is normal — grade whatever is in front instead.
+            if case ChromeCapture.CaptureError.notRunning = error {
+                captureFrontDocumentAsPage(url: "", title: "")
+            } else if case ChromeCapture.CaptureError.noTab = error {
+                captureFrontDocumentAsPage(url: "", title: "")
+            } else {
+                statusItem.status = .error(error.localizedDescription)
+            }
+        }
+    }
+
+    private func captureFrontDocumentAsPage(url: String, title: String) {
+        DocumentCapture.frontDocumentText { [weak self] text in
+            guard let self else { return }
+            guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                self.statusItem.status = .error("Couldn't read the page — click into it, then try Option+E again")
+                return
+            }
+            let page = ChromeCapture.Page(url: url, title: title, text: text)
+            self.start(.page(page.promptBlock))
         }
     }
 

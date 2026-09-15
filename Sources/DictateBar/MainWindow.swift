@@ -5,7 +5,9 @@ import UniformTypeIdentifiers
 /// The full app window: Home, History, Class notes, Suggestions, Appearance, Settings.
 final class MainWindowController {
     enum Page: String, CaseIterable, Identifiable {
-        case home = "Home", schedule = "Schedule", brief = "Morning brief", history = "History", classes = "Class notes", suggestions = "Suggestions",
+        case home = "Today", brief = "Morning brief", schedule = "Schedule",
+             dashboard = "Dashboard", assignments = "Assignments", courses = "Courses",
+             classes = "Class notes", suggestions = "Suggestions", history = "History",
              appearance = "Appearance", settings = "Settings"
         var id: String { rawValue }
         var icon: String {
@@ -13,11 +15,28 @@ final class MainWindowController {
             case .home: return "house"
             case .brief: return "sunrise"
             case .schedule: return "calendar.day.timeline.left"
+            case .dashboard: return "square.grid.2x2"
+            case .assignments: return "list.bullet.rectangle"
+            case .courses: return "books.vertical"
             case .history: return "clock"
             case .classes: return "book"
             case .suggestions: return "pin"
             case .appearance: return "paintpalette"
             case .settings: return "gearshape"
+            }
+        }
+    }
+
+    /// The sidebar groups, in order.
+    enum Section: String, CaseIterable, Identifiable {
+        case today = "Today", canvas = "Canvas", work = "Your work", setup = "Setup"
+        var id: String { rawValue }
+        var pages: [Page] {
+            switch self {
+            case .today: return [.home, .brief, .schedule]
+            case .canvas: return [.dashboard, .assignments, .courses]
+            case .work: return [.classes, .suggestions, .history]
+            case .setup: return [.appearance, .settings]
             }
         }
     }
@@ -57,15 +76,24 @@ private struct MainView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(MainWindowController.Page.allCases, selection: $selection.page) { page in
-                Label(page.rawValue, systemImage: page.icon).tag(page)
+            List(selection: $selection.page) {
+                ForEach(MainWindowController.Section.allCases) { section in
+                    SwiftUI.Section(section.rawValue) {
+                        ForEach(section.pages) { page in
+                            Label(page.rawValue, systemImage: page.icon).tag(page)
+                        }
+                    }
+                }
             }
-            .navigationSplitViewColumnWidth(180)
+            .navigationSplitViewColumnWidth(200)
         } detail: {
             switch selection.page {
             case .home: HomeView(state: state)
             case .brief: BriefView(state: state)
             case .schedule: ScheduleView(state: state)
+            case .dashboard: CanvasDashboardView(state: state)
+            case .assignments: CanvasAssignmentsView(state: state)
+            case .courses: CanvasCoursesView(state: state)
             case .history: HistoryView(state: state)
             case .classes: ClassesView(state: state)
             case .suggestions: SuggestionsView(state: state)
@@ -97,6 +125,7 @@ private struct HomeView: View {
                 action("Clipboard prompt", "doc.on.clipboard", "⌥V") { state.actions.clipboardPrompt() }
                 action("Notes", "note.text", "⌥N") { state.actions.notes() }
                 action("Grade", "checkmark.seal", "⌥G") { state.actions.grade() }
+                action("This page", "safari", "⌥E") { state.actions.page() }
                 action("Paste class notes", "arrow.down.doc", "⌥P") { state.actions.pasteNotes() }
             }
 

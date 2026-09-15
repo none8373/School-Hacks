@@ -31,6 +31,7 @@ enum Paths {
     static let notesPrompt = resources.appendingPathComponent("prompts/notes.md")
     static let gradePrompt = resources.appendingPathComponent("prompts/grade.md")
     static let classPrompt = resources.appendingPathComponent("prompts/class.md")
+    static let pagePrompt = resources.appendingPathComponent("prompts/page.md")
     static let briefPrompt = resources.appendingPathComponent("prompts/brief.md")
     static let schedulePrompt = resources.appendingPathComponent("prompts/schedule.md")
     static let schoolPrompt = resources.appendingPathComponent("prompts/school.md")
@@ -38,7 +39,10 @@ enum Paths {
     static let scheduleDocs = library.appendingPathComponent("schedule")
     static let briefs = library.appendingPathComponent("briefs")
     static let envFile = root.appendingPathComponent(".env")
-    static let venv = root.appendingPathComponent(".venv")
+    /// Outside Documents for the same reason as the models: iCloud evicts files from
+    /// synced folders, and an evicted package makes `import requests` time out mid-sync.
+    static let venv = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/DictateBar/venv")
     static let classes = library.appendingPathComponent("classes")
     static let syncScript = resources.appendingPathComponent("sync/sync_canvas.py")
     static let venvPython = venv.appendingPathComponent("bin/python")

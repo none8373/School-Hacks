@@ -7,8 +7,11 @@ cd "$(dirname "$0")/.."
 DATA="$HOME/Documents/DictateBar"
 mkdir -p "$DATA"
 echo "→ Python environment for Canvas sync"
-[ -d "$DATA/.venv" ] || python3 -m venv "$DATA/.venv"
-"$DATA/.venv/bin/pip" install -q --upgrade pip requests pypdf
+# Kept outside Documents so iCloud can't evict the packages mid-sync.
+VENV="$HOME/Library/Application Support/DictateBar/venv"
+mkdir -p "$(dirname "$VENV")"
+[ -d "$VENV" ] || python3 -m venv "$VENV"
+"$VENV/bin/pip" install -q --upgrade pip requests pypdf
 
 MODEL=${1:-base.en}
 # Kept outside Documents so iCloud can't evict it.

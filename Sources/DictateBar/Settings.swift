@@ -72,17 +72,33 @@ struct Settings: Codable, Equatable {
         Paths.models.appendingPathComponent("ggml-\(whisperModel).bin")
     }
 
-    var resolvedWhisperPath: String { Settings.expand(whisperPath) }
-    var resolvedClaudePath: String { Settings.expand(claudePath) }
-    var resolvedCodexPath: String {
-        let bundled = Settings.expand(codexPath)
-        if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
-        for dir in ["/opt/homebrew/bin", "/usr/local/bin", Settings.expand("~/.local/bin")] {
-            let candidate = dir + "/codex"
+    var resolvedWhisperPath: String { Settings.resolve(whisperPath, named: "whisper-cli") }
+    var resolvedClaudePath: String { Settings.resolve(claudePath, named: "claude") }
+    var resolvedCodexPath: String { Settings.resolve(codexPath, named: "codex") }
+
+    /// The configured path wins if it exists; otherwise look where the tool usually
+    /// lands. Homebrew is /opt/homebrew on Apple Silicon and /usr/local on Intel, so
+    /// a config written on one Mac still works on the other.
+    private static func resolve(_ configured: String, named tool: String) -> String {
+        let expanded = expand(configured)
+        if FileManager.default.isExecutableFile(atPath: expanded) { return expanded }
+        for dir in searchPath {
+            let candidate = dir + "/" + tool
             if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
         }
-        return bundled
+        return expanded
     }
+
+    /// Where command line tools live, plus whatever the user's own PATH adds.
+    private static let searchPath: [String] = {
+        var dirs = ["/opt/homebrew/bin", "/usr/local/bin", expand("~/.local/bin"), "/usr/bin",
+                    expand("~/.codex/plugins/.plugin-appserver")]
+        if let path = ProcessInfo.processInfo.environment["PATH"] {
+            dirs += path.split(separator: ":").map(String.init)
+        }
+        var seen = Set<String>()
+        return dirs.filter { seen.insert($0).inserted }
+    }()
 
     private static func expand(_ path: String) -> String {
         (path as NSString).expandingTildeInPath

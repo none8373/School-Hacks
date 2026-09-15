@@ -28,6 +28,8 @@ final class AppState: ObservableObject {
     @Published var briefs: [ClassNote] = []      // reuse: subject = date, text = brief
     @Published var schedule: Schedule?
     @Published var scheduleStatus = ""
+    @Published var canvas = CanvasBoard.empty
+    @Published var lastSync = ""
 
     struct Actions {
         var record: () -> Void = {}
@@ -35,6 +37,7 @@ final class AppState: ObservableObject {
         var clipboardPrompt: () -> Void = {}
         var notes: () -> Void = {}
         var grade: () -> Void = {}
+        var page: () -> Void = {}
         var pasteNotes: () -> Void = {}
         var writeSuggestion: () -> Void = {}
         var nextSuggestion: () -> Void = {}
@@ -61,6 +64,8 @@ final class AppState: ObservableObject {
         classNotes = AppState.loadClassNotes()
         briefs = AppState.loadBriefs()
         schedule = Schedule.load()
+        canvas = CanvasBoard.load()
+        lastSync = CanvasSync.lastSyncDescription()
     }
 
     private static func loadBriefs() -> [ClassNote] {

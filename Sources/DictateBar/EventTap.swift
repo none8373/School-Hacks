@@ -5,8 +5,8 @@ import ApplicationServices
 /// Hotkeys are swallowed so other apps never see them; normal typing is only observed.
 final class EventTap {
     enum Hotkey {
-        case record, clipboard, notes, grade, classRecord, pasteNotes, writeSuggestion, nextSuggestion, doneSuggestion, openWindow,
-             playPause, hide, wordBack, wordForward, sentenceBack, sentenceForward
+        case record, clipboard, notes, grade, page, classRecord, pasteNotes, writeSuggestion, nextSuggestion, doneSuggestion,
+             openWindow, playPause, hide, wordBack, wordForward, sentenceBack, sentenceForward
     }
 
     enum Typed {
@@ -116,6 +116,7 @@ final class EventTap {
         case 9: return .clipboard        // V
         case 45: return .notes           // N
         case 5: return .grade            // G
+        case 14: return .page            // E
         case 8: return .classRecord      // C
         case 35: return .pasteNotes      // P
         case 13: return .writeSuggestion // W

@@ -8,6 +8,7 @@ final class Pipeline {
         case notes(String)   // optional extra request text
         case grade(String)   // the document to grade
         case brief           // the morning brief across all classes
+        case page(String)    // the Chrome page: write it, or grade it and revise
 
         var label: String {
             switch self {
@@ -15,6 +16,7 @@ final class Pipeline {
             case .notes: return "notes"
             case .grade: return "grade"
             case .brief: return "brief"
+            case .page: return "page"
             }
         }
 
@@ -24,6 +26,7 @@ final class Pipeline {
             case .notes: return Paths.notesPrompt
             case .grade: return Paths.gradePrompt
             case .brief: return Paths.briefPrompt
+            case .page: return Paths.pagePrompt
             }
         }
 
@@ -33,6 +36,7 @@ final class Pipeline {
             case .notes(let extra): return extra.isEmpty ? "Produce the notes for the current assignment now." : "REQUEST:\n\n" + extra
             case .grade(let doc): return "STUDENT DOCUMENT:\n\n" + doc
             case .brief: return "Produce today's morning brief now."
+            case .page(let block): return block
             }
         }
 
@@ -280,6 +284,9 @@ final class Pipeline {
                 throw PipelineError.nothingHeard
             }
             if case .grade(let doc) = mode, doc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw PipelineError.nothingHeard
+            }
+            if case .page(let block) = mode, block.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 throw PipelineError.nothingHeard
             }
             if case .notes = mode, settings.subject.isEmpty { throw PipelineError.noSubject }
